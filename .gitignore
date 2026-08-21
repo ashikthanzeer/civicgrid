@@ -168,3 +168,6 @@ openspec/changes/*
 *.tmp
 *.temp
 *.orig
+
+openspec/
+.github/
