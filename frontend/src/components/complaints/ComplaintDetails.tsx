@@ -1,0 +1,298 @@
+import React, { useState } from 'react';
+import { Copy, Check, ArrowLeft, Bot, ShieldAlert, Navigation, MapPin } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import type { Complaint, ComplaintStatus } from '../../types/complaint';
+import { SeverityBadge } from '../ui/SeverityBadge';
+import { UrgencyBadge } from '../ui/UrgencyBadge';
+import { CategoryBadge } from '../ui/CategoryBadge';
+import { StatusBadge } from '../ui/StatusBadge';
+import { updateComplaintStatus } from '../../api/complaints';
+import { STATUS_OPTIONS } from '../../utils/constants';
+
+interface ComplaintDetailsProps {
+  complaint: Complaint;
+}
+
+const STATUS_ORDER: ComplaintStatus[] = ['New', 'Under Review', 'Assigned', 'In Progress', 'Resolved'];
+
+function formatFullDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+export const ComplaintDetails: React.FC<ComplaintDetailsProps> = ({ complaint: initialComplaint }) => {
+  const navigate = useNavigate();
+  const [complaint, setComplaint] = useState(initialComplaint);
+  const [copied, setCopied] = useState(false);
+  const [updating, setUpdating] = useState(false);
+  const [updateError, setUpdateError] = useState<string | null>(null);
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(complaint.id);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleStatusChange = async (newStatus: ComplaintStatus) => {
+    if (newStatus === complaint.status || updating) return;
+    setUpdating(true);
+    setUpdateError(null);
+    try {
+      const updated = await updateComplaintStatus(complaint.id, newStatus);
+      setComplaint(updated);
+    } catch {
+      setUpdateError('Status update failed. Please try again.');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const currentStatusIndex = STATUS_ORDER.indexOf(complaint.status);
+
+  return (
+    <div className="space-y-6 max-w-5xl mx-auto">
+      {/* Back nav & Header */}
+      <div>
+        <button
+          onClick={() => navigate('/complaints')}
+          className="flex items-center gap-2 text-sm font-medium transition-opacity hover:opacity-70 focus:outline-none mb-6"
+          style={{ color: 'var(--color-muted)' }}
+          aria-label="Back to complaints list"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to Complaints
+        </button>
+        <div
+          className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b pb-4"
+          style={{ borderColor: 'var(--color-border)' }}
+        >
+          <div>
+            <p className="mb-1 text-sm font-medium" style={{ color: 'var(--color-primary)' }}>
+              {complaint.id}
+            </p>
+            <h1 className="font-display text-3xl font-bold tracking-tight" style={{ color: 'var(--color-text)' }}>
+              Complaint details
+            </h1>
+          </div>
+          <div className="flex items-center gap-3">
+            <StatusBadge status={complaint.status} />
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-col lg:flex-row gap-6">
+        {/* Main Content (Left) */}
+        <div className="flex-1 space-y-6">
+          {/* Metadata Strip */}
+          <div
+            className="rounded-xl p-4 flex flex-wrap gap-x-8 gap-y-4 text-sm"
+            style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
+          >
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--color-muted)' }}>Identifier</p>
+              <div className="flex items-center gap-2">
+                <span className="font-mono font-medium text-sm" style={{ color: 'var(--color-text)' }}>
+                  {complaint.id}
+                </span>
+                <button
+                  onClick={handleCopy}
+                  aria-label="Copy complaint ID"
+                  className="p-1.5 rounded-lg transition-colors hover:bg-[color-mix(in_srgb,var(--color-primary)_10%,transparent)]"
+                >
+                  {copied
+                    ? <Check className="w-3.5 h-3.5" style={{ color: 'var(--color-success)' }} />
+                    : <Copy className="w-3.5 h-3.5" style={{ color: 'var(--color-muted)' }} />
+                  }
+                </button>
+              </div>
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--color-muted)' }}>Submitted</p>
+              <p className="font-medium" style={{ color: 'var(--color-text)' }}>
+                {formatFullDate(complaint.created_at)}
+              </p>
+            </div>
+            {complaint.updated_at !== complaint.created_at && (
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--color-muted)' }}>Last updated</p>
+                <p className="font-medium" style={{ color: 'var(--color-text)' }}>
+                  {formatFullDate(complaint.updated_at)}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Citizen Report */}
+          <section>
+            <h2 className="text-lg font-bold flex items-center gap-2 mb-4" style={{ color: 'var(--color-text)' }}>
+              <ShieldAlert className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
+              Original report
+            </h2>
+            <div
+              className="rounded-xl p-6 relative overflow-hidden"
+              style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
+            >
+              <div
+                className="absolute top-0 left-0 w-1 h-full"
+                style={{ backgroundColor: 'var(--color-primary)' }}
+              />
+              <p className="text-base leading-relaxed italic pl-2" style={{ color: 'var(--color-text)' }}>
+                "{complaint.raw_text}"
+              </p>
+            </div>
+          </section>
+
+          {/* Status Timeline */}
+          <section>
+            <h2 className="text-lg font-bold flex items-center gap-2 mb-4" style={{ color: 'var(--color-text)' }}>
+              <Navigation className="w-5 h-5" style={{ color: 'var(--color-success)' }} />
+              Status timeline
+            </h2>
+            <div
+              className="rounded-xl p-6"
+              style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
+            >
+              <div className="flex items-center gap-0 overflow-x-auto pb-2">
+                {STATUS_ORDER.map((status, index) => {
+                  const isDone = index <= currentStatusIndex;
+                  const isCurrent = index === currentStatusIndex;
+                  return (
+                    <React.Fragment key={status}>
+                      <div className="flex flex-col items-center gap-1.5 min-w-[80px]">
+                        <div
+                          className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold transition-all"
+                          style={{
+                            backgroundColor: isDone ? 'var(--color-primary)' : 'var(--color-elevated)',
+                            color: isDone ? 'var(--color-primary-fg)' : 'var(--color-muted)',
+                            transform: isCurrent ? 'scale(1.15)' : 'scale(1)',
+                            boxShadow: isCurrent ? '0 0 0 3px color-mix(in srgb, var(--color-primary) 25%, transparent)' : 'none',
+                          }}
+                        >
+                          {index + 1}
+                        </div>
+                        <span
+                          className="text-center text-[10px] font-semibold leading-tight"
+                          style={{ color: isDone ? 'var(--color-text)' : 'var(--color-muted)', maxWidth: '72px' }}
+                        >
+                          {status}
+                        </span>
+                      </div>
+                      {index < STATUS_ORDER.length - 1 && (
+                        <div
+                          className="h-px flex-1 min-w-[16px] mx-1 mb-4 transition-colors"
+                          style={{ backgroundColor: index < currentStatusIndex ? 'var(--color-primary)' : 'var(--color-border)' }}
+                        />
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </div>
+            </div>
+          </section>
+
+          {/* Admin: Update Status */}
+          <section>
+            <h2 className="text-lg font-bold flex items-center gap-2 mb-4" style={{ color: 'var(--color-text)' }}>
+              Update Status
+            </h2>
+            <div
+              className="rounded-xl p-5"
+              style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
+            >
+              <p className="mb-3 text-sm" style={{ color: 'var(--color-muted)' }}>
+                Move this complaint to a new status:
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {STATUS_OPTIONS.map((status) => (
+                  <button
+                    key={status}
+                    type="button"
+                    onClick={() => handleStatusChange(status)}
+                    disabled={updating || status === complaint.status}
+                    className="rounded-lg px-3 py-1.5 text-sm font-medium transition-all"
+                    style={{
+                      backgroundColor: status === complaint.status
+                        ? 'color-mix(in srgb, var(--color-primary) 12%, transparent)'
+                        : 'var(--color-background)',
+                      color: status === complaint.status ? 'var(--color-primary)' : 'var(--color-text)',
+                      border: `1px solid ${status === complaint.status ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                      opacity: updating ? 0.5 : 1,
+                      cursor: status === complaint.status || updating ? 'default' : 'pointer',
+                    }}
+                  >
+                    {status}
+                  </button>
+                ))}
+              </div>
+              {updateError && (
+                <p className="mt-3 text-xs" style={{ color: 'var(--color-danger)' }}>{updateError}</p>
+              )}
+            </div>
+          </section>
+        </div>
+
+        {/* AI Sidebar (Right) */}
+        <div className="w-full lg:w-80 space-y-6">
+          <div
+            className="overflow-hidden rounded-xl"
+            style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
+          >
+            <div
+              className="flex items-center gap-2 border-b p-4"
+              style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-elevated)' }}
+            >
+              <Bot className="h-5 w-5" style={{ color: 'var(--color-primary)' }} />
+              <h2 className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>
+                AI classification
+              </h2>
+            </div>
+            <div className="space-y-5 p-5">
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-muted)' }}>Category</p>
+                <div className="flex flex-col gap-2">
+                  <CategoryBadge category={complaint.category} />
+                  <span className="text-sm font-medium pl-1" style={{ color: 'var(--color-text)' }}>{complaint.subcategory}</span>
+                </div>
+              </div>
+
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-muted)' }}>Priority</p>
+                <div className="flex gap-2">
+                  <SeverityBadge severity={complaint.severity} />
+                  <UrgencyBadge urgency={complaint.urgency} />
+                </div>
+              </div>
+
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-muted)' }}>Location</p>
+                <div className="flex items-start gap-2">
+                  <MapPin className="mt-0.5 h-4 w-4 shrink-0" style={{ color: 'var(--color-primary)' }} />
+                  <div>
+                    <p className="text-sm font-medium" style={{ color: 'var(--color-text)' }}>{complaint.location}</p>
+                    {complaint.affected_facility && complaint.affected_facility !== 'Unknown' && (
+                      <p className="mt-1 text-xs" style={{ color: 'var(--color-muted)' }}>
+                        Facility: {complaint.affected_facility}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {complaint.summary && (
+                <div className="border-t pt-4" style={{ borderColor: 'var(--color-border)' }}>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-muted)' }}>Summary</p>
+                  <p className="text-sm leading-relaxed" style={{ color: 'var(--color-text)' }}>{complaint.summary}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
