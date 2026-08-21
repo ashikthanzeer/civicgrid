@@ -11,10 +11,6 @@ import threading
 from datetime import datetime, timezone
 from typing import Any
 
-# Check for PostgreSQL connection string (Supabase, Neon, Render Postgres)
-DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
-IS_POSTGRES = DATABASE_URL.startswith("postgresql://") or DATABASE_URL.startswith("postgres://")
-
 _DB_PATH_DEFAULT = os.path.join(os.path.dirname(__file__), "..", "data", "civicgrid.db")
 DB_PATH = os.environ.get("CIVICGRID_DB_PATH", _DB_PATH_DEFAULT)
 
@@ -46,11 +42,19 @@ VALID_STATUSES: frozenset[str] = frozenset(
 _ALLOWED_STATS_COLS: frozenset[str] = frozenset({"status", "category", "severity"})
 
 
+def _get_database_url() -> str:
+    return os.environ.get("DATABASE_URL", "").strip()
+
+
+def _is_postgres() -> bool:
+    url = _get_database_url()
+    return url.startswith("postgresql://") or url.startswith("postgres://")
+
+
 def _get_pg_conn():
     import psycopg
     from psycopg.rows import dict_row
-    # Fix for Heroku/older providers using postgres:// instead of postgresql://
-    conn_url = DATABASE_URL
+    conn_url = _get_database_url()
     if conn_url.startswith("postgres://"):
         conn_url = "postgresql://" + conn_url[11:]
     return psycopg.connect(conn_url, row_factory=dict_row)
@@ -68,7 +72,7 @@ def _get_sqlite_conn() -> sqlite3.Connection:
 def init_db() -> None:
     """Create tables and indexes if they do not already exist."""
     with _lock:
-        if IS_POSTGRES:
+        if _is_postgres():
             with _get_pg_conn() as conn:
                 with conn.cursor() as cur:
                     cur.execute(_CREATE_TABLE_SQL)
@@ -113,7 +117,7 @@ def insert_complaint(
     """Insert a new complaint and return the full record."""
     now = datetime.now(timezone.utc).isoformat()
     with _lock:
-        if IS_POSTGRES:
+        if _is_postgres():
             with _get_pg_conn() as conn:
                 complaint_id = _next_id_pg(conn)
                 with conn.cursor() as cur:
@@ -159,7 +163,7 @@ def insert_complaint(
 def get_complaint(complaint_id: str) -> dict[str, Any] | None:
     """Return a single complaint by ID, or None if not found."""
     with _lock:
-        if IS_POSTGRES:
+        if _is_postgres():
             with _get_pg_conn() as conn:
                 with conn.cursor() as cur:
                     cur.execute("SELECT * FROM complaints WHERE id = %s", (complaint_id,))
@@ -190,7 +194,8 @@ def list_complaints(
     """Return (complaints, total_count) applying filters, sort, and pagination."""
     conditions: list[str] = []
     params: list[Any] = []
-    ph = "%s" if IS_POSTGRES else "?"
+    is_pg = _is_postgres()
+    ph = "%s" if is_pg else "?"
 
     def _in(col: str, vals: list[str]) -> None:
         placeholders = ",".join(ph * len(vals))
@@ -206,7 +211,7 @@ def list_complaints(
     if location:
         _in("location", location)
     if search:
-        op = "ILIKE" if IS_POSTGRES else "LIKE"
+        op = "ILIKE" if is_pg else "LIKE"
         conditions.append(f"(summary {op} {ph} OR raw_text {op} {ph} OR subcategory {op} {ph})")
         like = f"%{search}%"
         params.extend([like, like, like])
@@ -228,7 +233,7 @@ def list_complaints(
     order = _ORDER.get(sort, "created_at DESC")
 
     with _lock:
-        if IS_POSTGRES:
+        if _is_postgres():
             with _get_pg_conn() as conn:
                 with conn.cursor() as cur:
                     cur.execute(f"SELECT COUNT(*) FROM complaints {where}", params)
@@ -260,7 +265,7 @@ def update_complaint_status(complaint_id: str, new_status: str) -> dict[str, Any
         raise ValueError(f"Invalid status {new_status!r}. Must be one of: {sorted(VALID_STATUSES)}")
     now = datetime.now(timezone.utc).isoformat()
     with _lock:
-        if IS_POSTGRES:
+        if _is_postgres():
             with _get_pg_conn() as conn:
                 with conn.cursor() as cur:
                     cur.execute(
@@ -289,7 +294,7 @@ def update_complaint_status(complaint_id: str, new_status: str) -> dict[str, Any
 def get_stats() -> dict[str, Any]:
     """Return aggregate statistics across all complaints."""
     with _lock:
-        if IS_POSTGRES:
+        if _is_postgres():
             with _get_pg_conn() as conn:
                 with conn.cursor() as cur:
                     cur.execute("SELECT COUNT(*) FROM complaints")

@@ -38,23 +38,27 @@ app = FastAPI(
 
 import os
 
-# Configurable CORS origins with safe development defaults
-_cors_env = os.getenv("CORS_ORIGINS", "")
-_allowed_origins = [o.strip() for o in _cors_env.split(",") if o.strip()] or [
-    "http://localhost:5173",  # Vite dev
-    "http://localhost:4173",  # Vite preview
-    "http://localhost:3000",
-    "http://127.0.0.1:5173",
-    "http://127.0.0.1:4173",
-]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=_allowed_origins,
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization", "Accept"],
-)
+# Configurable CORS origins with public API defaults (* or specific domains)
+_cors_env = os.getenv("CORS_ORIGINS", "").strip()
+if _cors_env and _cors_env != "*":
+    _allowed_origins = [o.strip() for o in _cors_env.split(",") if o.strip()]
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=_allowed_origins,
+        allow_origin_regex=r"https://.*\.vercel\.app",
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+else:
+    # Default: allow all origins for public civic reporting & Vercel deployments
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=False,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 
 # ---------------------------------------------------------------------------

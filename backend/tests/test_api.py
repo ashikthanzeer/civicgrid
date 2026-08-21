@@ -12,8 +12,9 @@ import tempfile
 import pytest
 from fastapi.testclient import TestClient
 
-# Force MockClassifier for all tests in this module
+# Force MockClassifier and local isolated SQLite for all tests in this module
 os.environ["USE_MOCK_CLASSIFIER"] = "true"
+os.environ["DATABASE_URL"] = ""
 
 # Use an isolated temp database so tests don't pollute production data
 _tmpdir = tempfile.mkdtemp()
