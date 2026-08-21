@@ -1,4 +1,8 @@
-"""SQLite persistence layer for CivicGrid complaints."""
+"""
+Persistence layer for CivicGrid complaints.
+Supports both SQLite (local/testing default) and PostgreSQL (Supabase, Neon, Render).
+Automatically detects DATABASE_URL in environment.
+"""
 from __future__ import annotations
 
 import os
@@ -7,25 +11,29 @@ import threading
 from datetime import datetime, timezone
 from typing import Any
 
+# Check for PostgreSQL connection string (Supabase, Neon, Render Postgres)
+DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
+IS_POSTGRES = DATABASE_URL.startswith("postgresql://") or DATABASE_URL.startswith("postgres://")
+
 _DB_PATH_DEFAULT = os.path.join(os.path.dirname(__file__), "..", "data", "civicgrid.db")
 DB_PATH = os.environ.get("CIVICGRID_DB_PATH", _DB_PATH_DEFAULT)
 
 _lock = threading.Lock()
 
-_CREATE_SQL = """
+_CREATE_TABLE_SQL = """
 CREATE TABLE IF NOT EXISTS complaints (
-    id               TEXT PRIMARY KEY,
-    raw_text         TEXT NOT NULL,
-    category         TEXT NOT NULL,
-    subcategory      TEXT NOT NULL,
-    severity         TEXT NOT NULL,
-    urgency          TEXT NOT NULL,
-    location         TEXT NOT NULL,
+    id                TEXT PRIMARY KEY,
+    raw_text          TEXT NOT NULL,
+    category          TEXT NOT NULL,
+    subcategory       TEXT NOT NULL,
+    severity          TEXT NOT NULL,
+    urgency           TEXT NOT NULL,
+    location          TEXT NOT NULL,
     affected_facility TEXT NOT NULL,
-    summary          TEXT NOT NULL,
-    status           TEXT NOT NULL DEFAULT 'New',
-    created_at       TEXT NOT NULL,
-    updated_at       TEXT NOT NULL
+    summary           TEXT NOT NULL,
+    status            TEXT NOT NULL DEFAULT 'New',
+    created_at        TEXT NOT NULL,
+    updated_at        TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_complaints_status   ON complaints(status);
 CREATE INDEX IF NOT EXISTS idx_complaints_category ON complaints(category);
@@ -35,9 +43,20 @@ CREATE INDEX IF NOT EXISTS idx_complaints_created  ON complaints(created_at);
 VALID_STATUSES: frozenset[str] = frozenset(
     {"New", "Under Review", "Assigned", "In Progress", "Resolved"}
 )
+_ALLOWED_STATS_COLS: frozenset[str] = frozenset({"status", "category", "severity"})
 
 
-def _connect() -> sqlite3.Connection:
+def _get_pg_conn():
+    import psycopg
+    from psycopg.rows import dict_row
+    # Fix for Heroku/older providers using postgres:// instead of postgresql://
+    conn_url = DATABASE_URL
+    if conn_url.startswith("postgres://"):
+        conn_url = "postgresql://" + conn_url[11:]
+    return psycopg.connect(conn_url, row_factory=dict_row)
+
+
+def _get_sqlite_conn() -> sqlite3.Connection:
     path = os.path.abspath(DB_PATH)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     conn = sqlite3.connect(path, check_same_thread=False)
@@ -49,19 +68,35 @@ def _connect() -> sqlite3.Connection:
 def init_db() -> None:
     """Create tables and indexes if they do not already exist."""
     with _lock:
-        conn = _connect()
-        try:
-            conn.executescript(_CREATE_SQL)
-            conn.commit()
-        finally:
-            conn.close()
+        if IS_POSTGRES:
+            with _get_pg_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(_CREATE_TABLE_SQL)
+                conn.commit()
+        else:
+            conn = _get_sqlite_conn()
+            try:
+                conn.executescript(_CREATE_TABLE_SQL)
+                conn.commit()
+            finally:
+                conn.close()
 
 
-def _next_id(conn: sqlite3.Connection) -> str:
+def _next_id_sqlite(conn: sqlite3.Connection) -> str:
     year = datetime.now(timezone.utc).year
     row = conn.execute("SELECT COUNT(*) FROM complaints").fetchone()
     n = (row[0] or 0) + 1
     return f"COMP-{year}-{n:04d}"
+
+
+def _next_id_pg(conn) -> str:
+    year = datetime.now(timezone.utc).year
+    with conn.cursor() as cur:
+        cur.execute("SELECT COUNT(*) FROM complaints")
+        row = cur.fetchone()
+        count = list(row.values())[0] if isinstance(row, dict) else row[0]
+        n = (count or 0) + 1
+        return f"COMP-{year}-{n:04d}"
 
 
 def insert_complaint(
@@ -78,39 +113,67 @@ def insert_complaint(
     """Insert a new complaint and return the full record."""
     now = datetime.now(timezone.utc).isoformat()
     with _lock:
-        conn = _connect()
-        try:
-            complaint_id = _next_id(conn)
-            conn.execute(
-                """
-                INSERT INTO complaints
-                  (id, raw_text, category, subcategory, severity, urgency,
-                   location, affected_facility, summary, status, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'New', ?, ?)
-                """,
-                (
-                    complaint_id, raw_text, category, subcategory, severity, urgency,
-                    location, affected_facility, summary, now, now,
-                ),
-            )
-            conn.commit()
-            row = conn.execute("SELECT * FROM complaints WHERE id = ?", (complaint_id,)).fetchone()
-            return dict(row)
-        finally:
-            conn.close()
+        if IS_POSTGRES:
+            with _get_pg_conn() as conn:
+                complaint_id = _next_id_pg(conn)
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        INSERT INTO complaints
+                          (id, raw_text, category, subcategory, severity, urgency,
+                           location, affected_facility, summary, status, created_at, updated_at)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 'New', %s, %s)
+                        RETURNING *
+                        """,
+                        (
+                            complaint_id, raw_text, category, subcategory, severity, urgency,
+                            location, affected_facility, summary, now, now,
+                        ),
+                    )
+                    row = cur.fetchone()
+                conn.commit()
+                return dict(row)
+        else:
+            conn = _get_sqlite_conn()
+            try:
+                complaint_id = _next_id_sqlite(conn)
+                conn.execute(
+                    """
+                    INSERT INTO complaints
+                      (id, raw_text, category, subcategory, severity, urgency,
+                       location, affected_facility, summary, status, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'New', ?, ?)
+                    """,
+                    (
+                        complaint_id, raw_text, category, subcategory, severity, urgency,
+                        location, affected_facility, summary, now, now,
+                    ),
+                )
+                conn.commit()
+                row = conn.execute("SELECT * FROM complaints WHERE id = ?", (complaint_id,)).fetchone()
+                return dict(row)
+            finally:
+                conn.close()
 
 
 def get_complaint(complaint_id: str) -> dict[str, Any] | None:
     """Return a single complaint by ID, or None if not found."""
     with _lock:
-        conn = _connect()
-        try:
-            row = conn.execute(
-                "SELECT * FROM complaints WHERE id = ?", (complaint_id,)
-            ).fetchone()
-            return dict(row) if row else None
-        finally:
-            conn.close()
+        if IS_POSTGRES:
+            with _get_pg_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT * FROM complaints WHERE id = %s", (complaint_id,))
+                    row = cur.fetchone()
+                    return dict(row) if row else None
+        else:
+            conn = _get_sqlite_conn()
+            try:
+                row = conn.execute(
+                    "SELECT * FROM complaints WHERE id = ?", (complaint_id,)
+                ).fetchone()
+                return dict(row) if row else None
+            finally:
+                conn.close()
 
 
 def list_complaints(
@@ -127,9 +190,10 @@ def list_complaints(
     """Return (complaints, total_count) applying filters, sort, and pagination."""
     conditions: list[str] = []
     params: list[Any] = []
+    ph = "%s" if IS_POSTGRES else "?"
 
     def _in(col: str, vals: list[str]) -> None:
-        placeholders = ",".join("?" * len(vals))
+        placeholders = ",".join(ph * len(vals))
         conditions.append(f"{col} IN ({placeholders})")
         params.extend(vals)
 
@@ -142,7 +206,8 @@ def list_complaints(
     if location:
         _in("location", location)
     if search:
-        conditions.append("(summary LIKE ? OR raw_text LIKE ? OR subcategory LIKE ?)")
+        op = "ILIKE" if IS_POSTGRES else "LIKE"
+        conditions.append(f"(summary {op} {ph} OR raw_text {op} {ph} OR subcategory {op} {ph})")
         like = f"%{search}%"
         params.extend([like, like, like])
 
@@ -163,18 +228,30 @@ def list_complaints(
     order = _ORDER.get(sort, "created_at DESC")
 
     with _lock:
-        conn = _connect()
-        try:
-            total = conn.execute(
-                f"SELECT COUNT(*) FROM complaints {where}", params
-            ).fetchone()[0]
-            rows = conn.execute(
-                f"SELECT * FROM complaints {where} ORDER BY {order} LIMIT ? OFFSET ?",
-                params + [limit, skip],
-            ).fetchall()
-            return [dict(r) for r in rows], total
-        finally:
-            conn.close()
+        if IS_POSTGRES:
+            with _get_pg_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(f"SELECT COUNT(*) FROM complaints {where}", params)
+                    count_row = cur.fetchone()
+                    total = list(count_row.values())[0] if isinstance(count_row, dict) else count_row[0]
+
+                    query_sql = f"SELECT * FROM complaints {where} ORDER BY {order} LIMIT %s OFFSET %s"
+                    cur.execute(query_sql, params + [limit, skip])
+                    rows = cur.fetchall()
+                    return [dict(r) for r in rows], int(total)
+        else:
+            conn = _get_sqlite_conn()
+            try:
+                total = conn.execute(
+                    f"SELECT COUNT(*) FROM complaints {where}", params
+                ).fetchone()[0]
+                rows = conn.execute(
+                    f"SELECT * FROM complaints {where} ORDER BY {order} LIMIT ? OFFSET ?",
+                    params + [limit, skip],
+                ).fetchall()
+                return [dict(r) for r in rows], total
+            finally:
+                conn.close()
 
 
 def update_complaint_status(complaint_id: str, new_status: str) -> dict[str, Any] | None:
@@ -183,45 +260,79 @@ def update_complaint_status(complaint_id: str, new_status: str) -> dict[str, Any
         raise ValueError(f"Invalid status {new_status!r}. Must be one of: {sorted(VALID_STATUSES)}")
     now = datetime.now(timezone.utc).isoformat()
     with _lock:
-        conn = _connect()
-        try:
-            result = conn.execute(
-                "UPDATE complaints SET status = ?, updated_at = ? WHERE id = ?",
-                (new_status, now, complaint_id),
-            )
-            conn.commit()
-            if result.rowcount == 0:
-                return None
-            row = conn.execute("SELECT * FROM complaints WHERE id = ?", (complaint_id,)).fetchone()
-            return dict(row)
-        finally:
-            conn.close()
+        if IS_POSTGRES:
+            with _get_pg_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "UPDATE complaints SET status = %s, updated_at = %s WHERE id = %s RETURNING *",
+                        (new_status, now, complaint_id),
+                    )
+                    row = cur.fetchone()
+                conn.commit()
+                return dict(row) if row else None
+        else:
+            conn = _get_sqlite_conn()
+            try:
+                result = conn.execute(
+                    "UPDATE complaints SET status = ?, updated_at = ? WHERE id = ?",
+                    (new_status, now, complaint_id),
+                )
+                conn.commit()
+                if result.rowcount == 0:
+                    return None
+                row = conn.execute("SELECT * FROM complaints WHERE id = ?", (complaint_id,)).fetchone()
+                return dict(row)
+            finally:
+                conn.close()
 
 
 def get_stats() -> dict[str, Any]:
     """Return aggregate statistics across all complaints."""
     with _lock:
-        conn = _connect()
-        try:
-            total = conn.execute("SELECT COUNT(*) FROM complaints").fetchone()[0]
+        if IS_POSTGRES:
+            with _get_pg_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT COUNT(*) FROM complaints")
+                    total_row = cur.fetchone()
+                    total = list(total_row.values())[0] if isinstance(total_row, dict) else total_row[0]
 
-            _ALLOWED_STATS_COLS = frozenset({"status", "category", "severity"})
+                    def _group_pg(col: str) -> dict[str, int]:
+                        if col not in _ALLOWED_STATS_COLS:
+                            raise ValueError(f"Invalid column: {col!r}")
+                        cur.execute(f"SELECT {col}, COUNT(*) FROM complaints GROUP BY {col}")
+                        rows = cur.fetchall()
+                        res = {}
+                        for r in rows:
+                            vals = list(r.values()) if isinstance(r, dict) else list(r)
+                            res[vals[0]] = vals[1]
+                        return res
 
-            def _group(col: str) -> dict[str, int]:
-                if col not in _ALLOWED_STATS_COLS:
-                    raise ValueError(f"Invalid column for stats grouping: {col!r}")
+                    return {
+                        "total": int(total),
+                        "by_status": _group_pg("status"),
+                        "by_category": _group_pg("category"),
+                        "by_severity": _group_pg("severity"),
+                    }
+        else:
+            conn = _get_sqlite_conn()
+            try:
+                total = conn.execute("SELECT COUNT(*) FROM complaints").fetchone()[0]
+
+                def _group_sqlite(col: str) -> dict[str, int]:
+                    if col not in _ALLOWED_STATS_COLS:
+                        raise ValueError(f"Invalid column: {col!r}")
+                    return {
+                        row[0]: row[1]
+                        for row in conn.execute(
+                            f"SELECT {col}, COUNT(*) FROM complaints GROUP BY {col}"
+                        ).fetchall()
+                    }
+
                 return {
-                    row[0]: row[1]
-                    for row in conn.execute(
-                        f"SELECT {col}, COUNT(*) FROM complaints GROUP BY {col}"
-                    ).fetchall()
+                    "total": total,
+                    "by_status": _group_sqlite("status"),
+                    "by_category": _group_sqlite("category"),
+                    "by_severity": _group_sqlite("severity"),
                 }
-
-            return {
-                "total": total,
-                "by_status": _group("status"),
-                "by_category": _group("category"),
-                "by_severity": _group("severity"),
-            }
-        finally:
-            conn.close()
+            finally:
+                conn.close()

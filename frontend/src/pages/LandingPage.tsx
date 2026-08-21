@@ -54,10 +54,10 @@ const ISSUE_EXAMPLES = [
 
 const LandingPage: React.FC = () => {
   return (
-    <div className="space-y-24 pb-16">
+    <div className="space-y-14 sm:space-y-20 lg:space-y-24 pb-12 sm:pb-16">
 
       {/* ── Hero ────────────────────────────────────────────────────────── */}
-      <section className="relative mx-auto max-w-3xl pt-8 text-center lg:pt-12">
+      <section className="relative mx-auto max-w-3xl pt-4 sm:pt-8 text-center lg:pt-12 px-1">
         <div
           className="mb-4 inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-semibold uppercase tracking-wider"
           style={{
@@ -80,28 +80,28 @@ const LandingPage: React.FC = () => {
         </div>
 
         <h1
-          className="font-display text-5xl font-bold tracking-tight sm:text-6xl lg:text-7xl"
-          style={{ lineHeight: 1.08 }}
+          className="font-display text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight"
+          style={{ lineHeight: 1.12 }}
         >
           Every complaint,{' '}
           <span style={{ color: 'var(--color-primary)' }}>understood</span>.
         </h1>
 
         <p
-          className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed sm:text-xl"
+          className="mx-auto mt-4 sm:mt-6 max-w-2xl text-base sm:text-lg lg:text-xl leading-relaxed"
           style={{ color: 'var(--color-muted)' }}
         >
           CivicGrid turns unstructured citizen complaints into structured, prioritised, actionable civic intelligence — instantly.
         </p>
 
-        <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <Link to="/submit" className="btn-primary">
+        <div className="mt-8 sm:mt-10 flex flex-col items-stretch sm:items-center justify-center gap-3 sm:flex-row">
+          <Link to="/submit" className="btn-primary w-full sm:w-auto">
             Report an Issue
             <ArrowRight className="h-4 w-4" aria-hidden />
           </Link>
           <Link
             to="/dashboard"
-            className="btn-secondary"
+            className="btn-secondary w-full sm:w-auto"
           >
             View Dashboard
           </Link>

@@ -154,10 +154,13 @@ export const ComplaintDetails: React.FC<ComplaintDetailsProps> = ({ complaint: i
               Status timeline
             </h2>
             <div
-              className="rounded-xl p-6"
+              className="rounded-xl p-4 sm:p-6"
               style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
             >
-              <div className="flex items-center gap-0 overflow-x-auto pb-2">
+              <div
+                className="flex items-center gap-0 overflow-x-auto pb-3 -mx-1 px-1"
+                style={{ WebkitOverflowScrolling: 'touch' }}
+              >
                 {STATUS_ORDER.map((status, index) => {
                   const isDone = index <= currentStatusIndex;
                   const isCurrent = index === currentStatusIndex;

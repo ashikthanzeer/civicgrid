@@ -153,9 +153,9 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({ onTranscript, disabled }
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2.5">
         {/* Language selector */}
-        <div className="relative">
+        <div className="relative min-w-[140px] flex-1 sm:flex-none">
           <select
             value={language}
             onChange={(e) => setLanguage(e.target.value as VoiceLanguage)}
