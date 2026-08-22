@@ -105,8 +105,8 @@ def submit_complaint(req: SubmitComplaintIn) -> SubmitComplaintResponse:
         logger.error("Unexpected classifier error: %s", exc, exc_info=True)
         raise HTTPException(status_code=500, detail="An unexpected error occurred.") from exc
 
-    # Prefer AI-extracted location; fall back to user-provided.
-    location = classification.location if classification.location not in ("", "Unknown") else req.location
+    # ALWAYS prioritize user-input location over AI extraction
+    location = req.location.strip() if (req.location and req.location.strip() != "") else classification.location
 
     # Auto-flag as Rejected / Spam if Gemini detects gibberish or inappropriate content
     is_spam = classification.is_spam or classification.category.value == "Spam / Invalid"
@@ -121,11 +121,22 @@ def submit_complaint(req: SubmitComplaintIn) -> SubmitComplaintResponse:
             cand_sub = (cand.get("subcategory") or "").lower()
             new_sub = (classification.subcategory or "").lower()
             if new_sub in cand_sub or cand_sub in new_sub or classification.category.value != "Other":
-                # If new text is similar length without significant extra details, mark as duplicate link
-                if len(req.text) <= len(cand.get("raw_text", "")) + 40:
-                    is_duplicate = True
-                    duplicate_of_id = cand["id"]
-                    break
+                is_duplicate = True
+                duplicate_of_id = cand["id"]
+                break
+
+    # If duplicate, MERGE into the original complaint instead of creating a standalone duplicate
+    if is_duplicate and duplicate_of_id:
+        merged_row = db.merge_duplicate_into_original(
+            original_id=duplicate_of_id,
+            new_text=req.text,
+            image_url=req.image_b64 if req.image_b64 else None,
+        )
+        if merged_row:
+            cleaned = _clean_complaint(merged_row)
+            cleaned.is_duplicate = True
+            cleaned.duplicate_of_id = duplicate_of_id
+            return SubmitComplaintResponse(success=True, complaint=cleaned)
 
     row = db.insert_complaint(
         raw_text=req.text,
@@ -141,8 +152,8 @@ def submit_complaint(req: SubmitComplaintIn) -> SubmitComplaintResponse:
         longitude=req.longitude,
         image_url=req.image_b64 if req.image_b64 else None,
         image_analysis=classification.image_analysis,
-        is_duplicate=is_duplicate,
-        duplicate_of_id=duplicate_of_id,
+        is_duplicate=False,
+        duplicate_of_id=None,
     )
     return SubmitComplaintResponse(success=True, complaint=_clean_complaint(row))
 

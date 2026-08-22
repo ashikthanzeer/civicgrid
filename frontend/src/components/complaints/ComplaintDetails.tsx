@@ -87,6 +87,11 @@ export const ComplaintDetails: React.FC<ComplaintDetailsProps> = ({ complaint: i
             </h1>
           </div>
           <div className="flex items-center gap-3">
+            {(complaint.citizen_reports_count ?? 1) > 1 && (
+              <span className="rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20 px-3 py-1 text-xs font-bold flex items-center gap-1.5">
+                <span>🔥 Endorsed by {complaint.citizen_reports_count} citizens at this location</span>
+              </span>
+            )}
             <StatusBadge status={complaint.status} />
           </div>
         </div>
@@ -189,6 +194,55 @@ export const ComplaintDetails: React.FC<ComplaintDetailsProps> = ({ complaint: i
               )}
             </div>
           </section>
+
+          {/* Additional Citizen Reports Timeline */}
+          {(() => {
+            let updates: Array<{ text: string; created_at: string; image_url?: string }> = [];
+            if (complaint.additional_updates) {
+              if (typeof complaint.additional_updates === 'string') {
+                try { updates = JSON.parse(complaint.additional_updates); } catch { updates = []; }
+              } else if (Array.isArray(complaint.additional_updates)) {
+                updates = complaint.additional_updates;
+              }
+            }
+            if (updates.length === 0) return null;
+            return (
+              <section>
+                <h2 className="text-lg font-bold flex items-center gap-2 mb-4" style={{ color: 'var(--color-text)' }}>
+                  <span>👥 Additional Citizen Endorsements & Updates ({updates.length})</span>
+                </h2>
+                <div className="space-y-3">
+                  {updates.map((up, idx) => (
+                    <div
+                      key={idx}
+                      className="rounded-xl border p-4 text-left"
+                      style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-semibold text-[var(--color-primary)]">
+                          Complementary Citizen Report #{idx + 1}
+                        </span>
+                        <span className="text-xs text-[var(--color-muted)]">
+                          {formatFullDate(up.created_at)}
+                        </span>
+                      </div>
+                      <p className="text-sm italic text-[var(--color-text)] mb-2">
+                        "{up.text}"
+                      </p>
+                      {up.image_url && (
+                        <img
+                          src={up.image_url}
+                          alt="Complementary visual evidence"
+                          className="max-h-48 rounded-lg object-cover border mt-2"
+                          style={{ borderColor: 'var(--color-border)' }}
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </section>
+            );
+          })()}
 
           {/* Status Timeline */}
           <section>

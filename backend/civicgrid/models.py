@@ -40,6 +40,8 @@ class ComplaintOut(BaseModel):
     image_analysis: str | None = None
     is_duplicate: bool = False
     duplicate_of_id: str | None = None
+    citizen_reports_count: int = 1
+    additional_updates: str = "[]"
 
 
 class SubmitComplaintResponse(BaseModel):

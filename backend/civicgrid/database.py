@@ -8,6 +8,7 @@ from __future__ import annotations
 import os
 import sqlite3
 import threading
+import json
 from datetime import datetime, timezone
 from typing import Any
 
@@ -35,7 +36,9 @@ CREATE TABLE IF NOT EXISTS complaints (
     image_url         TEXT,
     image_analysis    TEXT,
     is_duplicate      INTEGER DEFAULT 0,
-    duplicate_of_id   TEXT
+    duplicate_of_id   TEXT,
+    citizen_reports_count INTEGER DEFAULT 1,
+    additional_updates TEXT DEFAULT '[]'
 );
 CREATE INDEX IF NOT EXISTS idx_complaints_status   ON complaints(status);
 CREATE INDEX IF NOT EXISTS idx_complaints_category ON complaints(category);
@@ -127,6 +130,8 @@ def init_db() -> None:
                     cur.execute("ALTER TABLE complaints ADD COLUMN IF NOT EXISTS image_analysis TEXT;")
                     cur.execute("ALTER TABLE complaints ADD COLUMN IF NOT EXISTS is_duplicate INTEGER DEFAULT 0;")
                     cur.execute("ALTER TABLE complaints ADD COLUMN IF NOT EXISTS duplicate_of_id TEXT;")
+                    cur.execute("ALTER TABLE complaints ADD COLUMN IF NOT EXISTS citizen_reports_count INTEGER DEFAULT 1;")
+                    cur.execute("ALTER TABLE complaints ADD COLUMN IF NOT EXISTS additional_updates TEXT DEFAULT '[]';")
                     _seed_officer(cur, is_pg=True)
                 conn.commit()
         else:
@@ -134,7 +139,7 @@ def init_db() -> None:
             try:
                 conn.executescript(_CREATE_TABLE_SQL)
                 # Migration for existing SQLite DBs
-                for col in ["latitude REAL", "longitude REAL", "image_url TEXT", "image_analysis TEXT", "is_duplicate INTEGER DEFAULT 0", "duplicate_of_id TEXT"]:
+                for col in ["latitude REAL", "longitude REAL", "image_url TEXT", "image_analysis TEXT", "is_duplicate INTEGER DEFAULT 0", "duplicate_of_id TEXT", "citizen_reports_count INTEGER DEFAULT 1", "additional_updates TEXT DEFAULT '[]'"]:
                     try:
                         conn.execute(f"ALTER TABLE complaints ADD COLUMN {col}")
                     except sqlite3.OperationalError:
@@ -547,5 +552,63 @@ def delete_complaint(complaint_id: str) -> bool:
                 cur = conn.execute("DELETE FROM complaints WHERE id = ?", (complaint_id,))
                 conn.commit()
                 return cur.rowcount > 0
+            finally:
+                conn.close()
+
+
+def merge_duplicate_into_original(original_id: str, new_text: str, image_url: str | None = None) -> dict[str, Any] | None:
+    """Increment citizen_reports_count and append text/photo to additional_updates array on original complaint."""
+    now = datetime.now(timezone.utc).isoformat()
+    update_entry = {"text": new_text, "created_at": now, "image_url": image_url}
+
+    with _lock:
+        row = get_complaint(original_id)
+        if not row:
+            return None
+
+        existing_count = row.get("citizen_reports_count") or 1
+        new_count = existing_count + 1
+
+        raw_updates = row.get("additional_updates") or "[]"
+        try:
+            updates_list = json.loads(raw_updates) if isinstance(raw_updates, str) else list(raw_updates)
+        except Exception:
+            updates_list = []
+        updates_list.append(update_entry)
+        new_updates_json = json.dumps(updates_list)
+
+        if _is_postgres():
+            with _get_pg_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        UPDATE complaints
+                        SET citizen_reports_count = %s,
+                            additional_updates = %s,
+                            updated_at = %s
+                        WHERE id = %s
+                        RETURNING *
+                        """,
+                        (new_count, new_updates_json, now, original_id),
+                    )
+                    updated_row = cur.fetchone()
+                conn.commit()
+                return dict(updated_row) if updated_row else None
+        else:
+            conn = _get_sqlite_conn()
+            try:
+                conn.execute(
+                    """
+                    UPDATE complaints
+                    SET citizen_reports_count = ?,
+                        additional_updates = ?,
+                        updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (new_count, new_updates_json, now, original_id),
+                )
+                conn.commit()
+                updated_row = conn.execute("SELECT * FROM complaints WHERE id = ?", (original_id,)).fetchone()
+                return dict(updated_row) if updated_row else None
             finally:
                 conn.close()
