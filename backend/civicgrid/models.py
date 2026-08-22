@@ -6,7 +6,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 # Match the frontend ComplaintStatus type
-ComplaintStatusLiteral = Literal["New", "Under Review", "Assigned", "In Progress", "Resolved"]
+ComplaintStatusLiteral = Literal["New", "Under Review", "Assigned", "In Progress", "Resolved", "Rejected / Spam"]
 
 
 class SubmitComplaintIn(BaseModel):
@@ -23,17 +23,17 @@ class UpdateStatusIn(BaseModel):
 
 class ComplaintOut(BaseModel):
     id: str
-    raw_text: str
-    category: str
-    subcategory: str
-    severity: str
-    urgency: str
-    location: str
-    affected_facility: str
-    summary: str
-    status: str
-    created_at: str
-    updated_at: str
+    raw_text: str = ""
+    category: str = "Other"
+    subcategory: str = "General Civic Issue"
+    severity: str = "Medium"
+    urgency: str = "Routine"
+    location: str = "Unknown"
+    affected_facility: str = "Unknown"
+    summary: str = ""
+    status: str = "New"
+    created_at: str = ""
+    updated_at: str = ""
     latitude: float | None = None
     longitude: float | None = None
     image_url: str | None = None

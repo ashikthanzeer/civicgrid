@@ -127,7 +127,7 @@ def submit_complaint(req: SubmitComplaintIn) -> SubmitComplaintResponse:
         image_url=req.image_b64 if req.image_b64 else None,
         image_analysis=classification.image_analysis,
     )
-    return SubmitComplaintResponse(success=True, complaint=ComplaintOut(**row))
+    return SubmitComplaintResponse(success=True, complaint=_clean_complaint(row))
 
 
 @app.get(
@@ -145,6 +145,18 @@ def get_stats() -> StatsResponse:
     "/api/complaints",
     response_model=ListComplaintsResponse,
     summary="List complaints with filters",
+    tags=["complaints"],
+)
+def _clean_complaint(row: dict) -> ComplaintOut:
+    """Strip None values for non-optional fields so Pydantic defaults apply cleanly."""
+    cleaned = {k: v for k, v in row.items() if v is not None}
+    return ComplaintOut(**cleaned)
+
+
+@app.get(
+    "/api/complaints",
+    response_model=ListComplaintsResponse,
+    summary="List complaints with filtering, sorting, and pagination",
     tags=["complaints"],
 )
 def list_complaints(
@@ -168,7 +180,7 @@ def list_complaints(
         limit=limit,
     )
     return ListComplaintsResponse(
-        complaints=[ComplaintOut(**r) for r in rows],
+        complaints=[_clean_complaint(r) for r in rows],
         total=total,
     )
 
@@ -183,11 +195,12 @@ def get_complaint(complaint_id: str) -> ComplaintOut:
     row = db.get_complaint(complaint_id)
     if not row:
         raise HTTPException(status_code=404, detail=f"Complaint '{complaint_id}' not found.")
-    return ComplaintOut(**row)
+    return _clean_complaint(row)
 
 
-@app.patch(
+@app.api_route(
     "/api/complaints/{complaint_id}",
+    methods=["PATCH", "PUT"],
     response_model=ComplaintOut,
     summary="Update complaint status",
     tags=["complaints"],
@@ -200,7 +213,7 @@ def update_complaint(complaint_id: str, req: UpdateStatusIn) -> ComplaintOut:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     if not row:
         raise HTTPException(status_code=404, detail=f"Complaint '{complaint_id}' not found.")
-    return ComplaintOut(**row)
+    return _clean_complaint(row)
 
 
 @app.post(
