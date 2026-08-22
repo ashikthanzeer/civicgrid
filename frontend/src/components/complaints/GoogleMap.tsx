@@ -116,11 +116,16 @@ export const GoogleMapView: React.FC<GoogleMapProps> = ({
 }) => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  // Only show complaints with valid coordinates
+  // Only show complaints with valid coordinates and exclude spam/rejected issues
   const geoComplaints = useMemo(
     () =>
       complaints.filter(
-        (c) => c.latitude != null && c.longitude != null && c.latitude !== 0 && c.longitude !== 0,
+        (c) =>
+          c.latitude != null &&
+          c.longitude != null &&
+          c.latitude !== 0 &&
+          c.longitude !== 0 &&
+          c.status !== 'Rejected / Spam',
       ),
     [complaints],
   );

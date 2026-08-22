@@ -7,6 +7,7 @@ const statusStyles: Record<ComplaintStatus, { color: string; background: string 
   'Assigned': { color: 'var(--color-primary)', background: 'color-mix(in srgb, var(--color-primary) 12%, transparent)' },
   'In Progress': { color: 'var(--color-structure)', background: 'color-mix(in srgb, var(--color-structure) 12%, transparent)' },
   'Resolved': { color: '#71A878', background: 'color-mix(in srgb, #71A878 12%, transparent)' },
+  'Rejected / Spam': { color: 'var(--color-danger)', background: 'color-mix(in srgb, var(--color-danger) 14%, transparent)' },
 };
 
 export const StatusBadge: React.FC<{ status: ComplaintStatus }> = ({ status }) => {

@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS officers (
 """
 
 VALID_STATUSES: frozenset[str] = frozenset(
-    {"New", "Under Review", "Assigned", "In Progress", "Resolved"}
+    {"New", "Under Review", "Assigned", "In Progress", "Resolved", "Rejected / Spam"}
 )
 _ALLOWED_STATS_COLS: frozenset[str] = frozenset({"status", "category", "severity"})
 
@@ -168,6 +168,7 @@ def insert_complaint(
     location: str,
     affected_facility: str,
     summary: str,
+    status: str = "New",
     latitude: float | None = None,
     longitude: float | None = None,
     image_url: str | None = None,
@@ -186,13 +187,26 @@ def insert_complaint(
                           (id, raw_text, category, subcategory, severity, urgency,
                            location, affected_facility, summary, status, created_at, updated_at,
                            latitude, longitude, image_url, image_analysis)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 'New', %s, %s, %s, %s, %s, %s)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         RETURNING *
                         """,
                         (
-                            complaint_id, raw_text, category, subcategory, severity, urgency,
-                            location, affected_facility, summary, now, now,
-                            latitude, longitude, image_url, image_analysis,
+                            complaint_id,
+                            raw_text,
+                            category,
+                            subcategory,
+                            severity,
+                            urgency,
+                            location,
+                            affected_facility,
+                            summary,
+                            status,
+                            now,
+                            now,
+                            latitude,
+                            longitude,
+                            image_url,
+                            image_analysis,
                         ),
                     )
                     row = cur.fetchone()
@@ -208,12 +222,25 @@ def insert_complaint(
                       (id, raw_text, category, subcategory, severity, urgency,
                        location, affected_facility, summary, status, created_at, updated_at,
                        latitude, longitude, image_url, image_analysis)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'New', ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
-                        complaint_id, raw_text, category, subcategory, severity, urgency,
-                        location, affected_facility, summary, now, now,
-                        latitude, longitude, image_url, image_analysis,
+                        complaint_id,
+                        raw_text,
+                        category,
+                        subcategory,
+                        severity,
+                        urgency,
+                        location,
+                        affected_facility,
+                        summary,
+                        status,
+                        now,
+                        now,
+                        latitude,
+                        longitude,
+                        image_url,
+                        image_analysis,
                     ),
                 )
                 conn.commit()

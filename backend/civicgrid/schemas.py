@@ -14,6 +14,7 @@ class ComplaintCategory(str, Enum):
     STREET_LIGHTING = "Street Lighting"
     DRAINAGE = "Drainage"
     PUBLIC_SAFETY = "Public Safety"
+    SPAM_INVALID = "Spam / Invalid"
     OTHER = "Other"
 
 
@@ -42,3 +43,4 @@ class CivicComplaint(BaseModel):
     affected_facility: str
     summary: str
     image_analysis: str
+    is_spam: bool = False

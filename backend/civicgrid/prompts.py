@@ -6,7 +6,14 @@ English enum labels for category, severity, and urgency.
 
 Choose exactly one category from:
 Roads, Water, Electricity, Waste Management, Public Transport, Healthcare,
-Education, Street Lighting, Drainage, Public Safety, Other.
+Education, Street Lighting, Drainage, Public Safety, Spam / Invalid, Other.
+
+CRITICAL SPAM & CONTENT MODERATION GUARD:
+If the input text is random gibberish (e.g., "qwerty12345", "test test test"), promotional spam, commercial advertisement, explicit profanity/abuse, or completely unrelated to public civic infrastructure or municipal services, you MUST:
+1. Set category to "Spam / Invalid"
+2. Set `is_spam` to true
+3. Set severity to "Low" and urgency to "Routine"
+4. Set summary to "Flagged by AI Content Guard as Spam or Inappropriate Content"
 
 Use a concise subcategory. Extract location and affected facility only when they
 are stated or directly inferable. If either is unavailable, use exactly "Unknown".

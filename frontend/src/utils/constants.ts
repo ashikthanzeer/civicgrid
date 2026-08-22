@@ -12,12 +12,13 @@ export const CATEGORIES: ComplaintCategory[] = [
   "Street Lighting",
   "Drainage",
   "Public Safety",
+  "Spam / Invalid",
   "Other",
 ];
 
 export const SEVERITY_LEVELS: Severity[] = ["Low", "Medium", "High", "Critical"];
 export const URGENCY_LEVELS: Urgency[] = ["Routine", "Soon", "Urgent", "Emergency"];
-export const STATUS_OPTIONS: ComplaintStatus[] = ["New", "Under Review", "Assigned", "In Progress", "Resolved"];
+export const STATUS_OPTIONS: ComplaintStatus[] = ["New", "Under Review", "Assigned", "In Progress", "Resolved", "Rejected / Spam"];
 
 // Google Maps defaults — centered on India
 export const INDIA_CENTER = { lat: 20.5937, lng: 78.9629 };

@@ -108,6 +108,10 @@ def submit_complaint(req: SubmitComplaintIn) -> SubmitComplaintResponse:
     # Prefer AI-extracted location; fall back to user-provided.
     location = classification.location if classification.location not in ("", "Unknown") else req.location
 
+    # Auto-flag as Rejected / Spam if Gemini detects gibberish or inappropriate content
+    is_spam = classification.is_spam or classification.category.value == "Spam / Invalid"
+    status = "Rejected / Spam" if is_spam else "New"
+
     row = db.insert_complaint(
         raw_text=req.text,
         category=classification.category.value,
@@ -117,6 +121,7 @@ def submit_complaint(req: SubmitComplaintIn) -> SubmitComplaintResponse:
         location=location,
         affected_facility=classification.affected_facility,
         summary=classification.summary,
+        status=status,
         latitude=req.latitude,
         longitude=req.longitude,
         image_url=req.image_b64 if req.image_b64 else None,
