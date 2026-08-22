@@ -179,14 +179,14 @@ def _to_list(val: list[str] | str | None) -> list[str] | None:
     tags=["complaints"],
 )
 def list_complaints(
-    status: Annotated[list[str] | str | None, Query(default=None, description="Filter by status")] = None,
-    category: Annotated[list[str] | str | None, Query(default=None, description="Filter by category")] = None,
-    severity: Annotated[list[str] | str | None, Query(default=None, description="Filter by severity")] = None,
-    location: Annotated[list[str] | str | None, Query(default=None, description="Filter by location")] = None,
-    search: Annotated[str | None, Query(default=None, description="Full-text search")] = None,
-    sort: Annotated[str, Query(default="newest", description="newest|oldest|highest_severity|highest_urgency")] = "newest",
-    skip: Annotated[int, Query(default=0, ge=0)] = 0,
-    limit: Annotated[int, Query(default=100, ge=1, le=500)] = 100,
+    status: list[str] | str | None = Query(None, description="Filter by status"),
+    category: list[str] | str | None = Query(None, description="Filter by category"),
+    severity: list[str] | str | None = Query(None, description="Filter by severity"),
+    location: list[str] | str | None = Query(None, description="Filter by location"),
+    search: str | None = Query(None, description="Full-text search"),
+    sort: str = Query("newest", description="newest|oldest|highest_severity|highest_urgency"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
 ) -> ListComplaintsResponse:
     rows, total = db.list_complaints(
         status=_to_list(status),
