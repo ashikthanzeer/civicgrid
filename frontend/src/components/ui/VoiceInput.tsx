@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Mic, Square, AlertTriangle } from 'lucide-react';
+import { Mic, Square, AlertTriangle, ChevronDown } from 'lucide-react';
 import { useI18n } from '../../i18n/useI18n';
 
 // Web Speech API type declarations
@@ -43,7 +43,7 @@ export const VOICE_LANGUAGES = [
 
 type VoiceLanguage = typeof VOICE_LANGUAGES[number]['code'];
 
-type RecordingState = 'idle' | 'recording' | 'processing';
+type RecordingState = 'idle' | 'recording' | 'error';
 
 interface VoiceInputProps {
   onTranscript: (text: string) => void;
@@ -83,69 +83,71 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({ onTranscript, disabled }
   }, []);
 
   const startRecording = useCallback(() => {
-    const SpeechRecognition = getSpeechRecognition();
-    if (!SpeechRecognition) return;
-
     setError(null);
     setInterimText('');
     finalTextRef.current = '';
 
-    const recognition = new SpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = language;
-    recognition.maxAlternatives = 1;
+    const SpeechRec = getSpeechRecognition();
+    if (!SpeechRec) {
+      setError('Voice recognition is not supported in this browser.');
+      return;
+    }
 
-    recognition.onstart = () => {
-      setState('recording');
-    };
+    try {
+      const recognition = new SpeechRec();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = language;
+      recognition.maxAlternatives = 1;
 
-    recognition.onresult = (event: SpeechRecognitionEvent) => {
-      let interim = '';
-      let finalSegment = '';
-
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const transcript = event.results[i][0].transcript;
-        if (event.results[i].isFinal) {
-          finalSegment += transcript + ' ';
-        } else {
-          interim += transcript;
-        }
-      }
-
-      if (finalSegment) {
-        finalTextRef.current += finalSegment;
-        onTranscript(finalTextRef.current.trim());
-      }
-      setInterimText(interim);
-    };
-
-    recognition.onerror = (event) => {
-      const errorMessages: Record<string, string> = {
-        'not-allowed': 'Microphone access denied. Please allow microphone in browser settings.',
-        'no-speech': 'No speech detected. Please try again.',
-        'network': 'Network error. Please check your connection.',
-        'audio-capture': 'No microphone found. Please connect a microphone.',
-        'aborted': '',
+      recognition.onstart = () => {
+        setState('recording');
       };
-      const msg = errorMessages[event.error] ?? `Voice error: ${event.error}`;
-      if (msg) setError(msg);
-      setState('idle');
-    };
 
-    recognition.onend = () => {
-      setState('idle');
-      setInterimText('');
-    };
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
+        let interim = '';
+        let final = finalTextRef.current;
 
-    recognitionRef.current = recognition;
-    recognition.start();
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            final += (final ? ' ' : '') + transcript.trim();
+            finalTextRef.current = final;
+            onTranscript(final);
+          } else {
+            interim += transcript;
+          }
+        }
+        setInterimText(interim);
+      };
+
+      recognition.onerror = (event: Event & { error: string }) => {
+        const errorMessages: Record<string, string> = {
+          'not-allowed': 'Microphone permission was denied. Please allow mic access.',
+          'no-speech': 'No speech was detected. Please try again.',
+          'network': 'Network error occurred during recognition.',
+        };
+        setError(errorMessages[event.error] ?? `Voice input error: ${event.error}`);
+        setState('error');
+      };
+
+      recognition.onend = () => {
+        setState('idle');
+        setInterimText('');
+      };
+
+      recognition.start();
+      recognitionRef.current = recognition;
+    } catch {
+      setError('Could not start microphone. Please check permissions.');
+      setState('error');
+    }
   }, [language, onTranscript]);
 
   if (!isSupported) {
     return (
       <div
-        className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs"
+        className="flex items-center gap-2 rounded-lg p-3 text-xs"
         style={{
           backgroundColor: 'color-mix(in srgb, var(--color-warning) 10%, transparent)',
           border: '1px solid color-mix(in srgb, var(--color-warning) 25%, transparent)',
@@ -162,19 +164,20 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({ onTranscript, disabled }
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2.5">
+      <div className="flex flex-wrap items-center gap-3">
         {/* Language selector */}
-        <div className="relative min-w-[140px] flex-1 sm:flex-none">
+        <div className="relative inline-flex items-center">
           <select
             value={language}
             onChange={(e) => setLanguage(e.target.value as VoiceLanguage)}
             disabled={isRecording || disabled}
-            className="rounded-lg border py-1.5 pl-3 pr-8 text-xs font-medium focus:outline-none appearance-none"
+            className="h-9 appearance-none rounded-xl border py-1.5 pl-3.5 pr-8 text-xs font-semibold focus:outline-none transition-all cursor-pointer shadow-xs"
             style={{
               borderColor: 'var(--color-border)',
               backgroundColor: 'var(--color-surface)',
               color: 'var(--color-text)',
-              cursor: isRecording ? 'not-allowed' : 'pointer',
+              cursor: isRecording || disabled ? 'not-allowed' : 'pointer',
+              opacity: isRecording || disabled ? 0.6 : 1,
             }}
             aria-label="Voice language"
           >
@@ -184,14 +187,11 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({ onTranscript, disabled }
               </option>
             ))}
           </select>
-          <div
-            className="pointer-events-none absolute inset-y-0 right-2 flex items-center"
-            style={{ color: 'var(--color-muted)' }}
-          >
-            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </div>
+          <ChevronDown
+            className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 opacity-60"
+            style={{ color: 'var(--color-text)' }}
+            aria-hidden="true"
+          />
         </div>
 
         {/* Record / Stop button */}
@@ -200,7 +200,7 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({ onTranscript, disabled }
           onClick={isRecording ? stopRecording : startRecording}
           disabled={disabled}
           aria-label={isRecording ? 'Stop recording' : 'Start voice recording'}
-          className="relative flex items-center gap-2 rounded-lg px-4 py-1.5 text-sm font-semibold transition-all"
+          className="relative inline-flex h-9 items-center gap-2 rounded-xl px-4 py-1.5 text-xs sm:text-sm font-semibold transition-all shadow-xs active:scale-95"
           style={{
             backgroundColor: isRecording
               ? 'color-mix(in srgb, var(--color-danger) 12%, transparent)'
@@ -213,7 +213,6 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({ onTranscript, disabled }
         >
           {isRecording ? (
             <>
-              {/* Pulse ring */}
               <span className="relative flex h-4 w-4 shrink-0">
                 <span
                   className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-60"
