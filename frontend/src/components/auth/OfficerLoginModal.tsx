@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X, ShieldCheck, KeyRound, User, Sparkles, Loader2 } from 'lucide-react';
 import { useRole } from '../../context/RoleContext';
 
@@ -43,16 +44,16 @@ export const OfficerLoginModal: React.FC<OfficerLoginModalProps> = ({ isOpen, on
     }
   };
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="officer-modal-title"
     >
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
+        className="fixed inset-0 bg-black/70 backdrop-blur-sm transition-opacity"
         onClick={onClose}
       />
 
@@ -204,6 +205,7 @@ export const OfficerLoginModal: React.FC<OfficerLoginModalProps> = ({ isOpen, on
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };
