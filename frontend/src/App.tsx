@@ -87,13 +87,17 @@ import { APIProvider } from '@vis.gl/react-google-maps';
 
 const MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 
+import { RoleProvider } from './context/RoleContext';
+
 function App() {
   return (
     <ThemeProvider>
       <I18nProvider>
-        <APIProvider apiKey={MAPS_API_KEY} libraries={['places']}>
-          <AppContent />
-        </APIProvider>
+        <RoleProvider>
+          <APIProvider apiKey={MAPS_API_KEY} libraries={['places']}>
+            <AppContent />
+          </APIProvider>
+        </RoleProvider>
       </I18nProvider>
     </ThemeProvider>
   );

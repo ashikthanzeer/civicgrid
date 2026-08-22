@@ -1,8 +1,10 @@
-import React from 'react';
-import { Menu, X, Grid3X3, PlusCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { Menu, X, Grid3X3, PlusCircle, ShieldCheck, LogOut, UserCheck } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { ThemeToggle } from '../ui/ThemeToggle';
 import { LanguageSelector } from '../ui/LanguageSelector';
+import { OfficerLoginModal } from '../auth/OfficerLoginModal';
+import { useRole } from '../../context/RoleContext';
 import { useI18n } from '../../i18n/useI18n';
 
 interface TopbarProps {
@@ -14,6 +16,8 @@ export const Topbar: React.FC<TopbarProps> = ({ onMenuClick, menuOpen = false })
   const location = useLocation();
   const isSubmitPage = location.pathname === '/submit';
   const { t } = useI18n();
+  const { isOfficer, officerProfile, logoutOfficer } = useRole();
+  const [modalOpen, setModalOpen] = useState(false);
 
   return (
     <header
@@ -80,7 +84,55 @@ export const Topbar: React.FC<TopbarProps> = ({ onMenuClick, menuOpen = false })
 
         <LanguageSelector />
         <ThemeToggle />
+
+        {/* Role Badge & Switcher */}
+        {isOfficer ? (
+          <div className="flex items-center gap-1">
+            <div
+              className="inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1 text-xs font-bold"
+              style={{
+                borderColor: 'color-mix(in srgb, var(--color-accent) 40%, transparent)',
+                backgroundColor: 'color-mix(in srgb, var(--color-accent) 12%, transparent)',
+                color: 'var(--color-accent)',
+              }}
+              title={`Logged in as Municipal Officer: ${officerProfile?.officer_id || 'OFFICER-2026'}`}
+            >
+              <ShieldCheck className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">{officerProfile?.officer_id || 'Officer'}</span>
+            </div>
+            <button
+              type="button"
+              onClick={logoutOfficer}
+              className="rounded-lg border px-2 py-1 text-[11px] font-semibold transition-opacity hover:opacity-80"
+              style={{
+                borderColor: 'var(--color-border)',
+                color: 'var(--color-muted)',
+                backgroundColor: 'var(--color-background)',
+              }}
+              title="Sign out of Officer Portal"
+            >
+              <LogOut className="h-3 w-3" />
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setModalOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1 text-xs font-semibold transition-all hover:opacity-90 active:scale-95"
+            style={{
+              borderColor: 'var(--color-border)',
+              backgroundColor: 'var(--color-background)',
+              color: 'var(--color-text)',
+            }}
+            title="Authenticate as Municipal Officer to update complaint statuses"
+          >
+            <UserCheck className="h-3.5 w-3.5" style={{ color: 'var(--color-primary)' }} />
+            <span className="hidden sm:inline">Officer Sign In</span>
+          </button>
+        )}
       </div>
+
+      <OfficerLoginModal isOpen={modalOpen} onClose={() => setModalOpen(false)} />
     </header>
   );
 };

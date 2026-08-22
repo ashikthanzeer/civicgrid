@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Copy, Check, ArrowLeft, Bot, ShieldAlert, Navigation, MapPin } from 'lucide-react';
+import { Copy, Check, ArrowLeft, Bot, ShieldAlert, Navigation, MapPin, Lock, ShieldCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { Complaint, ComplaintStatus } from '../../types/complaint';
 import { SeverityBadge } from '../ui/SeverityBadge';
@@ -7,6 +7,8 @@ import { UrgencyBadge } from '../ui/UrgencyBadge';
 import { CategoryBadge } from '../ui/CategoryBadge';
 import { StatusBadge } from '../ui/StatusBadge';
 import { TTSButton } from '../ui/TTSButton';
+import { OfficerLoginModal } from '../auth/OfficerLoginModal';
+import { useRole } from '../../context/RoleContext';
 import { updateComplaintStatus } from '../../api/complaints';
 import { STATUS_OPTIONS } from '../../utils/constants';
 import { useI18n } from '../../i18n/useI18n';
@@ -30,6 +32,8 @@ function formatFullDate(dateStr: string): string {
 export const ComplaintDetails: React.FC<ComplaintDetailsProps> = ({ complaint: initialComplaint }) => {
   const navigate = useNavigate();
   const { t } = useI18n();
+  const { isOfficer, officerProfile } = useRole();
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [complaint, setComplaint] = useState(initialComplaint);
   const [copied, setCopied] = useState(false);
   const [updating, setUpdating] = useState(false);
@@ -242,41 +246,84 @@ export const ComplaintDetails: React.FC<ComplaintDetailsProps> = ({ complaint: i
             <h2 className="text-lg font-bold flex items-center gap-2 mb-4" style={{ color: 'var(--color-text)' }}>
               {t.details.updateStatusTitle}
             </h2>
-            <div
-              className="rounded-xl p-5"
-              style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
-            >
-              <p className="mb-3 text-sm" style={{ color: 'var(--color-muted)' }}>
-                {t.details.updateStatusTitle}:
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {STATUS_OPTIONS.map((status) => (
-                  <button
-                    key={status}
-                    type="button"
-                    onClick={() => handleStatusChange(status)}
-                    disabled={updating || status === complaint.status}
-                    className="rounded-lg px-3 py-1.5 text-sm font-medium transition-all"
-                    style={{
-                      backgroundColor: status === complaint.status
-                        ? 'color-mix(in srgb, var(--color-primary) 12%, transparent)'
-                        : 'var(--color-background)',
-                      color: status === complaint.status ? 'var(--color-primary)' : 'var(--color-text)',
-                      border: `1px solid ${status === complaint.status ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                      opacity: updating ? 0.5 : 1,
-                      cursor: status === complaint.status || updating ? 'default' : 'pointer',
-                    }}
-                  >
-                    {status}
-                  </button>
-                ))}
+            {isOfficer ? (
+              <div
+                className="rounded-xl p-5"
+                style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
+              >
+                <div className="mb-3 flex items-center justify-between">
+                  <p className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>
+                    Authorized Municipal Officer Action:
+                  </p>
+                  <span className="text-xs font-mono px-2 py-0.5 rounded border" style={{ borderColor: 'var(--color-accent)', color: 'var(--color-accent)' }}>
+                    {officerProfile?.officer_id || 'OFFICER-2026'}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {STATUS_OPTIONS.map((status) => (
+                    <button
+                      key={status}
+                      type="button"
+                      onClick={() => handleStatusChange(status)}
+                      disabled={updating || status === complaint.status}
+                      className="rounded-lg px-3 py-1.5 text-sm font-medium transition-all"
+                      style={{
+                        backgroundColor: status === complaint.status
+                          ? 'color-mix(in srgb, var(--color-primary) 12%, transparent)'
+                          : 'var(--color-background)',
+                        color: status === complaint.status ? 'var(--color-primary)' : 'var(--color-text)',
+                        border: `1px solid ${status === complaint.status ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                        opacity: updating ? 0.5 : 1,
+                        cursor: status === complaint.status || updating ? 'default' : 'pointer',
+                      }}
+                    >
+                      {status}
+                    </button>
+                  ))}
+                </div>
+                {updateError && (
+                  <p className="mt-3 text-xs" style={{ color: 'var(--color-danger)' }}>{updateError}</p>
+                )}
               </div>
-              {updateError && (
-                <p className="mt-3 text-xs" style={{ color: 'var(--color-danger)' }}>{updateError}</p>
-              )}
-            </div>
+            ) : (
+              <div
+                className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-xl border p-5"
+                style={{
+                  backgroundColor: 'color-mix(in srgb, var(--color-primary) 4%, var(--color-surface))',
+                  borderColor: 'color-mix(in srgb, var(--color-primary) 20%, transparent)',
+                }}
+              >
+                <div className="flex items-center gap-3">
+                  <div
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+                    style={{ backgroundColor: 'color-mix(in srgb, var(--color-primary) 12%, transparent)' }}
+                  >
+                    <Lock className="h-5 w-5" style={{ color: 'var(--color-primary)' }} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold" style={{ color: 'var(--color-text)' }}>
+                      Municipal Officer Status Control
+                    </h3>
+                    <p className="text-xs" style={{ color: 'var(--color-muted)' }}>
+                      Status updates are restricted to authorized Municipal Officers to prevent complaint hijacking.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setLoginModalOpen(true)}
+                  className="btn-primary shrink-0 text-xs py-2 px-3.5 flex items-center gap-1.5"
+                >
+                  <ShieldCheck className="h-4 w-4" />
+                  <span>Officer Sign In</span>
+                </button>
+              </div>
+            )}
           </section>
         </div>
+
+        <OfficerLoginModal isOpen={loginModalOpen} onClose={() => setLoginModalOpen(false)} />
 
         {/* AI Sidebar (Right) */}
         <div className="w-full lg:w-80 space-y-6">

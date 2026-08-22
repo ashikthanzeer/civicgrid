@@ -1,7 +1,9 @@
 import React from 'react';
-import { Check, Palette, ShieldCheck, Languages } from 'lucide-react';
+import { Check, Palette, ShieldCheck, Languages, KeyRound } from 'lucide-react';
 import { useTheme, type Theme } from '../theme/useTheme';
 import { useI18n } from '../i18n/useI18n';
+import { useRole } from '../context/RoleContext';
+import { OfficerLoginModal } from '../components/auth/OfficerLoginModal';
 
 const THEME_OPTIONS: { value: Theme; key: 'lightTheme' | 'darkTheme' }[] = [
   { value: 'light', key: 'lightTheme' },
@@ -131,7 +133,174 @@ const SettingsPage: React.FC = () => {
             {t.settings.storageNotice}
           </p>
         </div>
+
+        {/* Officer Security & Password Card */}
+        <OfficerSecurityCard />
       </div>
+    </div>
+  );
+};
+
+const OfficerSecurityCard: React.FC = () => {
+  const { isOfficer, officerProfile, changeOfficerPassword } = useRole();
+  const [oldPassword, setOldPassword] = React.useState('');
+  const [newPassword, setNewPassword] = React.useState('');
+  const [confirmPassword, setConfirmPassword] = React.useState('');
+  const [message, setMessage] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+  const [loading, setLoading] = React.useState(false);
+  const [loginModalOpen, setLoginModalOpen] = React.useState(false);
+
+  if (!isOfficer) {
+    return (
+      <div className="surface-card p-6 md:col-span-2 border-dashed">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-primary)' }}>
+              Municipal Access Guard
+            </p>
+            <h2 className="mt-2 text-lg font-semibold" style={{ color: 'var(--color-text)' }}>
+              Officer Security & Password Management
+            </h2>
+          </div>
+          <KeyRound className="h-5 w-5 shrink-0" style={{ color: 'var(--color-primary)' }} />
+        </div>
+        <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--color-muted)' }}>
+          Authenticating as a Municipal Officer unlocks status update controls across complaints.
+        </p>
+        <div className="mt-4">
+          <button
+            type="button"
+            onClick={() => setLoginModalOpen(true)}
+            className="btn-primary text-xs py-2 px-4 flex items-center gap-1.5"
+          >
+            <ShieldCheck className="h-4 w-4" />
+            <span>Sign In as Municipal Officer</span>
+          </button>
+        </div>
+        <OfficerLoginModal isOpen={loginModalOpen} onClose={() => setLoginModalOpen(false)} />
+      </div>
+    );
+  }
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!oldPassword || !newPassword) {
+      setError('Please fill in both current and new password.');
+      return;
+    }
+    if (newPassword.length < 6) {
+      setError('New password must be at least 6 characters.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError('New password and confirm password do not match.');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    setMessage(null);
+
+    const res = await changeOfficerPassword(oldPassword, newPassword);
+    setLoading(false);
+
+    if (res.success) {
+      setMessage(res.message || 'Password changed successfully!');
+      setOldPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } else {
+      setError(res.error || 'Failed to change password. Please check your current password.');
+    }
+  };
+
+  return (
+    <div className="surface-card p-6 md:col-span-2">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-accent)' }}>
+            Authenticated Officer Portal
+          </p>
+          <h2 className="mt-2 text-lg font-semibold" style={{ color: 'var(--color-text)' }}>
+            Change Officer Password ({officerProfile?.officer_id || 'OFFICER-2026'})
+          </h2>
+        </div>
+        <KeyRound className="h-5 w-5 shrink-0" style={{ color: 'var(--color-accent)' }} />
+      </div>
+
+      <form onSubmit={handleChangePassword} className="mt-6 max-w-lg space-y-4">
+        <div>
+          <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--color-muted)' }}>
+            Current Password
+          </label>
+          <input
+            type="password"
+            value={oldPassword}
+            onChange={(e) => setOldPassword(e.target.value)}
+            placeholder="••••••••"
+            className="w-full rounded-lg border py-2 px-3 text-sm"
+            style={{
+              borderColor: 'var(--color-border)',
+              backgroundColor: 'var(--color-background)',
+              color: 'var(--color-text)',
+            }}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--color-muted)' }}>
+              New Password
+            </label>
+            <input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="Min 6 characters"
+              className="w-full rounded-lg border py-2 px-3 text-sm"
+              style={{
+                borderColor: 'var(--color-border)',
+                backgroundColor: 'var(--color-background)',
+                color: 'var(--color-text)',
+              }}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--color-muted)' }}>
+              Confirm New Password
+            </label>
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="Re-enter new password"
+              className="w-full rounded-lg border py-2 px-3 text-sm"
+              style={{
+                borderColor: 'var(--color-border)',
+                backgroundColor: 'var(--color-background)',
+                color: 'var(--color-text)',
+              }}
+            />
+          </div>
+        </div>
+
+        {error && (
+          <p className="text-xs font-medium" style={{ color: 'var(--color-danger)' }}>
+            {error}
+          </p>
+        )}
+
+        {message && (
+          <p className="text-xs font-medium" style={{ color: 'var(--color-success)' }}>
+            {message}
+          </p>
+        )}
+
+        <button type="submit" disabled={loading} className="btn-primary text-xs py-2 px-4">
+          {loading ? 'Updating Password...' : 'Update Password'}
+        </button>
+      </form>
     </div>
   );
 };

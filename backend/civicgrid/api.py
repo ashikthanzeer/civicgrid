@@ -18,6 +18,10 @@ from .models import (
     SubmitComplaintIn,
     SubmitComplaintResponse,
     UpdateStatusIn,
+    OfficerLoginIn,
+    OfficerLoginOut,
+    ChangePasswordIn,
+    ChangePasswordOut,
 )
 
 logger = logging.getLogger(__name__)
@@ -192,6 +196,38 @@ def update_complaint(complaint_id: str, req: UpdateStatusIn) -> ComplaintOut:
     if not row:
         raise HTTPException(status_code=404, detail=f"Complaint '{complaint_id}' not found.")
     return ComplaintOut(**row)
+
+
+@app.post(
+    "/api/officer/login",
+    response_model=OfficerLoginOut,
+    summary="Authenticate Municipal Officer with ID and password",
+    tags=["officer"],
+)
+def officer_login(req: OfficerLoginIn) -> OfficerLoginOut:
+    profile = db.verify_officer_credentials(req.officer_id, req.password)
+    if not profile:
+        raise HTTPException(status_code=401, detail="Invalid Officer ID or Password.")
+    return OfficerLoginOut(
+        success=True,
+        officer_id=profile["officer_id"],
+        name=profile["name"],
+        department=profile["department"],
+        token=f"officer_token_{profile['officer_id']}",
+    )
+
+
+@app.post(
+    "/api/officer/change-password",
+    response_model=ChangePasswordOut,
+    summary="Change Municipal Officer password",
+    tags=["officer"],
+)
+def change_password(req: ChangePasswordIn) -> ChangePasswordOut:
+    success = db.update_officer_password(req.officer_id, req.old_password, req.new_password)
+    if not success:
+        raise HTTPException(status_code=400, detail="Password change failed. Check your current password.")
+    return ChangePasswordOut(success=True, message="Officer password successfully updated.")
 
 
 @app.get("/api/health", summary="Health check", tags=["system"])

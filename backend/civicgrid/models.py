@@ -55,3 +55,27 @@ class StatsResponse(BaseModel):
     by_status: dict[str, int]
     by_category: dict[str, int]
     by_severity: dict[str, int]
+
+
+class OfficerLoginIn(BaseModel):
+    officer_id: str = Field(min_length=1, description="Unique Officer Identification Code")
+    password: str = Field(min_length=1, description="Officer Password")
+
+
+class OfficerLoginOut(BaseModel):
+    success: bool
+    officer_id: str
+    name: str
+    department: str
+    token: str
+
+
+class ChangePasswordIn(BaseModel):
+    officer_id: str = Field(min_length=1, description="Unique Officer Identification Code")
+    old_password: str = Field(min_length=1, description="Current Officer Password")
+    new_password: str = Field(min_length=6, description="New Officer Password")
+
+
+class ChangePasswordOut(BaseModel):
+    success: bool
+    message: str

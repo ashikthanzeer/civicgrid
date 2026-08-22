@@ -38,6 +38,14 @@ CREATE TABLE IF NOT EXISTS complaints (
 CREATE INDEX IF NOT EXISTS idx_complaints_status   ON complaints(status);
 CREATE INDEX IF NOT EXISTS idx_complaints_category ON complaints(category);
 CREATE INDEX IF NOT EXISTS idx_complaints_created  ON complaints(created_at);
+
+CREATE TABLE IF NOT EXISTS officers (
+    officer_id    TEXT PRIMARY KEY,
+    password_hash TEXT NOT NULL,
+    name          TEXT NOT NULL,
+    department    TEXT NOT NULL,
+    created_at    TEXT NOT NULL
+);
 """
 
 VALID_STATUSES: frozenset[str] = frozenset(
@@ -73,6 +81,37 @@ def _get_sqlite_conn() -> sqlite3.Connection:
     return conn
 
 
+import hashlib
+
+_SALT = "civicgrid_salt_2026"
+
+
+def hash_password(password: str) -> str:
+    return hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), _SALT.encode("utf-8"), 100000).hex()
+
+
+def _seed_officer(conn_or_cur, is_pg: bool):
+    pw_hash = hash_password("password123")
+    now = datetime.now(timezone.utc).isoformat()
+    if is_pg:
+        conn_or_cur.execute(
+            """
+            INSERT INTO officers (officer_id, password_hash, name, department, created_at)
+            VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (officer_id) DO NOTHING
+            """,
+            ("OFFICER-2026", pw_hash, "Officer R. Sharma", "Municipal Public Works", now),
+        )
+    else:
+        conn_or_cur.execute(
+            """
+            INSERT OR IGNORE INTO officers (officer_id, password_hash, name, department, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            ("OFFICER-2026", pw_hash, "Officer R. Sharma", "Municipal Public Works", now),
+        )
+
+
 def init_db() -> None:
     """Create tables and indexes if they do not already exist."""
     with _lock:
@@ -84,6 +123,7 @@ def init_db() -> None:
                     cur.execute("ALTER TABLE complaints ADD COLUMN IF NOT EXISTS longitude REAL;")
                     cur.execute("ALTER TABLE complaints ADD COLUMN IF NOT EXISTS image_url TEXT;")
                     cur.execute("ALTER TABLE complaints ADD COLUMN IF NOT EXISTS image_analysis TEXT;")
+                    _seed_officer(cur, is_pg=True)
                 conn.commit()
         else:
             conn = _get_sqlite_conn()
@@ -95,6 +135,7 @@ def init_db() -> None:
                         conn.execute(f"ALTER TABLE complaints ADD COLUMN {col}")
                     except sqlite3.OperationalError:
                         pass
+                _seed_officer(conn, is_pg=False)
                 conn.commit()
             finally:
                 conn.close()
@@ -361,5 +402,69 @@ def get_stats() -> dict[str, Any]:
                     "by_category": _group_sqlite("category"),
                     "by_severity": _group_sqlite("severity"),
                 }
+            finally:
+                conn.close()
+
+
+def verify_officer_credentials(officer_id: str, password: str) -> dict[str, Any] | None:
+    """Verify officer credentials and return officer profile if valid."""
+    target_hash = hash_password(password)
+    with _lock:
+        if _is_postgres():
+            with _get_pg_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "SELECT officer_id, name, department, password_hash FROM officers WHERE officer_id = %s",
+                        (officer_id,),
+                    )
+                    row = cur.fetchone()
+                    if row and row.get("password_hash") == target_hash:
+                        return {
+                            "officer_id": row["officer_id"],
+                            "name": row["name"],
+                            "department": row["department"],
+                        }
+        else:
+            conn = _get_sqlite_conn()
+            try:
+                row = conn.execute(
+                    "SELECT officer_id, name, department, password_hash FROM officers WHERE officer_id = ?",
+                    (officer_id,),
+                ).fetchone()
+                if row and row["password_hash"] == target_hash:
+                    return {
+                        "officer_id": row["officer_id"],
+                        "name": row["name"],
+                        "department": row["department"],
+                    }
+            finally:
+                conn.close()
+    return None
+
+
+def update_officer_password(officer_id: str, old_password: str, new_password: str) -> bool:
+    """Update officer password if old password matches."""
+    old_hash = hash_password(old_password)
+    new_hash = hash_password(new_password)
+    with _lock:
+        if _is_postgres():
+            with _get_pg_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "UPDATE officers SET password_hash = %s WHERE officer_id = %s AND password_hash = %s",
+                        (new_hash, officer_id, old_hash),
+                    )
+                    updated = cur.rowcount > 0
+                conn.commit()
+                return updated
+        else:
+            conn = _get_sqlite_conn()
+            try:
+                cur = conn.execute(
+                    "UPDATE officers SET password_hash = ? WHERE officer_id = ? AND password_hash = ?",
+                    (new_hash, officer_id, old_hash),
+                )
+                conn.commit()
+                return cur.rowcount > 0
             finally:
                 conn.close()
