@@ -94,4 +94,10 @@ export const mockHandlers = {
     };
     return inMemoryComplaints[index];
   },
+
+  deleteComplaint: async (id: string): Promise<{ success: boolean; message: string }> => {
+    await delay(300);
+    inMemoryComplaints = inMemoryComplaints.filter(c => c.id !== id);
+    return { success: true, message: `Complaint ${id} deleted.` };
+  },
 };

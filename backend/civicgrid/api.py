@@ -112,6 +112,21 @@ def submit_complaint(req: SubmitComplaintIn) -> SubmitComplaintResponse:
     is_spam = classification.is_spam or classification.category.value == "Spam / Invalid"
     status = "Rejected / Spam" if is_spam else "New"
 
+    # Check for duplicate open complaints at the same location & category
+    is_duplicate = False
+    duplicate_of_id = None
+    if not is_spam and location not in ("", "Unknown"):
+        candidates = db.find_open_complaints_by_location_category(location, classification.category.value)
+        for cand in candidates:
+            cand_sub = (cand.get("subcategory") or "").lower()
+            new_sub = (classification.subcategory or "").lower()
+            if new_sub in cand_sub or cand_sub in new_sub or classification.category.value != "Other":
+                # If new text is similar length without significant extra details, mark as duplicate link
+                if len(req.text) <= len(cand.get("raw_text", "")) + 40:
+                    is_duplicate = True
+                    duplicate_of_id = cand["id"]
+                    break
+
     row = db.insert_complaint(
         raw_text=req.text,
         category=classification.category.value,
@@ -126,6 +141,8 @@ def submit_complaint(req: SubmitComplaintIn) -> SubmitComplaintResponse:
         longitude=req.longitude,
         image_url=req.image_b64 if req.image_b64 else None,
         image_analysis=classification.image_analysis,
+        is_duplicate=is_duplicate,
+        duplicate_of_id=duplicate_of_id,
     )
     return SubmitComplaintResponse(success=True, complaint=_clean_complaint(row))
 
@@ -232,7 +249,17 @@ def update_complaint(complaint_id: str, req: UpdateStatusIn) -> ComplaintOut:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     if not row:
         raise HTTPException(status_code=404, detail=f"Complaint '{complaint_id}' not found.")
-    return _clean_complaint(row)
+@app.delete(
+    "/api/complaints/{complaint_id}",
+    summary="Permanently delete complaint (Officer only)",
+    tags=["complaints"],
+)
+def delete_complaint(complaint_id: str) -> dict:
+    """Physically remove a complaint entry."""
+    success = db.delete_complaint(complaint_id)
+    if not success:
+        raise HTTPException(status_code=404, detail=f"Complaint '{complaint_id}' not found.")
+    return {"success": True, "message": f"Complaint '{complaint_id}' deleted."}
 
 
 @app.post(

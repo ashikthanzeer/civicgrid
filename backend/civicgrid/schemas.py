@@ -44,3 +44,5 @@ class CivicComplaint(BaseModel):
     summary: str
     image_analysis: str
     is_spam: bool = False
+    is_duplicate: bool = False
+    duplicate_of_id: str | None = None

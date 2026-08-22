@@ -38,6 +38,8 @@ class ComplaintOut(BaseModel):
     longitude: float | None = None
     image_url: str | None = None
     image_analysis: str | None = None
+    is_duplicate: bool = False
+    duplicate_of_id: str | None = None
 
 
 class SubmitComplaintResponse(BaseModel):

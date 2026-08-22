@@ -35,4 +35,6 @@ export interface Complaint {
   longitude?: number | null;
   image_url?: string | null;
   image_analysis?: string | null;
+  is_duplicate?: boolean;
+  duplicate_of_id?: string | null;
 }

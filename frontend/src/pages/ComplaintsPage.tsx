@@ -12,6 +12,10 @@ import type { Complaint, Severity, Urgency } from '../types/complaint';
 import type { ExplorerSort } from '../types/filters';
 import { useI18n } from '../i18n/useI18n';
 
+import { useRole } from '../context/RoleContext';
+import { updateComplaintStatus, deleteComplaint } from '../api/complaints';
+import { ShieldAlert, Trash2, CheckCircle } from 'lucide-react';
+
 const SEVERITY_RANK: Record<Severity, number> = { Low: 1, Medium: 2, High: 3, Critical: 4 };
 const URGENCY_RANK: Record<Urgency, number> = { Routine: 1, Soon: 2, Urgent: 3, Emergency: 4 };
 
@@ -32,16 +36,28 @@ function applySort(list: Complaint[], sort: ExplorerSort): Complaint[] {
 
 const ComplaintsPage: React.FC = () => {
   const { data, isLoading, isError, refetch } = useComplaints();
+  const { isOfficer } = useRole();
   const { t } = useI18n();
+  const [activeTab, setActiveTab] = useState<'genuine' | 'spam'>('genuine');
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState<string[]>([]);
   const [severity, setSeverity] = useState<string[]>([]);
   const [urgency, setUrgency] = useState<string[]>([]);
   const [location, setLocation] = useState<string[]>([]);
   const [sort, setSort] = useState<ExplorerSort>('newest');
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+
+  const spamComplaints = useMemo(
+    () => (data?.complaints ?? []).filter((c) => c.status === 'Rejected / Spam' || c.category === 'Spam / Invalid'),
+    [data?.complaints],
+  );
+  const genuineComplaints = useMemo(
+    () => (data?.complaints ?? []).filter((c) => c.status !== 'Rejected / Spam' && c.category !== 'Spam / Invalid'),
+    [data?.complaints],
+  );
 
   const filtered = useMemo(() => {
-    let list = data?.complaints ?? [];
+    let list = activeTab === 'spam' ? spamComplaints : genuineComplaints;
     if (search) {
       const q = search.toLowerCase();
       list = list.filter(
@@ -53,7 +69,28 @@ const ComplaintsPage: React.FC = () => {
     if (urgency.length) list = list.filter((c) => urgency.includes(c.urgency));
     if (location.length) list = list.filter((c) => location.includes(c.location));
     return applySort(list, sort);
-  }, [data, search, category, severity, urgency, location, sort]);
+  }, [activeTab, spamComplaints, genuineComplaints, search, category, severity, urgency, location, sort]);
+
+  const handleRestore = async (id: string) => {
+    setActionLoadingId(id);
+    try {
+      await updateComplaintStatus(id, 'New');
+      await refetch();
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Are you sure you want to permanently delete this spam complaint?')) return;
+    setActionLoadingId(id);
+    try {
+      await deleteComplaint(id);
+      await refetch();
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
 
   const locationOptions = useMemo(
     () =>
@@ -168,9 +205,44 @@ const ComplaintsPage: React.FC = () => {
         </div>
       </div>
 
+      <div className="flex items-center gap-3 border-b pb-1" style={{ borderColor: 'var(--color-border)' }}>
+        <button
+          type="button"
+          onClick={() => setActiveTab('genuine')}
+          className={`pb-2.5 text-sm font-semibold transition-colors border-b-2 flex items-center gap-2 ${
+            activeTab === 'genuine'
+              ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
+              : 'border-transparent text-[var(--color-muted)] hover:text-[var(--color-text)]'
+          }`}
+        >
+          <span>Active Genuine Complaints</span>
+          <span className="rounded-full bg-[var(--color-surface)] border px-2 py-0.5 text-xs">
+            {genuineComplaints.length}
+          </span>
+        </button>
+
+        {isOfficer && (
+          <button
+            type="button"
+            onClick={() => setActiveTab('spam')}
+            className={`pb-2.5 text-sm font-semibold transition-colors border-b-2 flex items-center gap-2 ${
+              activeTab === 'spam'
+                ? 'border-red-500 text-red-600 dark:text-red-400'
+                : 'border-transparent text-[var(--color-muted)] hover:text-[var(--color-text)]'
+            }`}
+          >
+            <ShieldAlert className="h-4 w-4 text-red-500" />
+            <span>Spam Vault 🚩</span>
+            <span className="rounded-full bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 px-2 py-0.5 text-xs">
+              {spamComplaints.length}
+            </span>
+          </button>
+        )}
+      </div>
+
       {!isLoading && !isError && (
         <p className="text-xs" style={{ color: 'var(--color-muted)' }}>
-          {filtered.length} {t.complaints.resultsCount}
+          {filtered.length} {t.complaints.resultsCount} {activeTab === 'spam' ? '(Quarantine Vault)' : ''}
         </p>
       )}
 
@@ -184,10 +256,56 @@ const ComplaintsPage: React.FC = () => {
         </div>
       ) : filtered.length === 0 ? (
         <EmptyState
-          title={t.complaints.emptyTitle}
-          description={t.complaints.emptyDesc}
+          title={activeTab === 'spam' ? 'No Spam Complaints Isolated' : t.complaints.emptyTitle}
+          description={activeTab === 'spam' ? 'No inappropriate or spam submissions are currently quarantined.' : t.complaints.emptyDesc}
           action={hasFilters ? { label: t.common.reset, onClick: clearAll } : undefined}
         />
+      ) : activeTab === 'spam' ? (
+        <div className="space-y-3">
+          {filtered.map((c) => (
+            <div
+              key={c.id}
+              className="surface-card p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-l-4 border-l-red-500"
+            >
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-xs font-semibold text-red-600 dark:text-red-400">{c.id}</span>
+                  <span className="rounded bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 px-2 py-0.5 text-[10px] font-bold uppercase">
+                    Flagged as Spam
+                  </span>
+                  <span className="text-xs text-[var(--color-muted)]">{c.location}</span>
+                </div>
+                <p className="text-sm font-medium" style={{ color: 'var(--color-text)' }}>
+                  "{c.raw_text}"
+                </p>
+                <p className="text-xs italic" style={{ color: 'var(--color-muted)' }}>
+                  {c.summary}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
+                <button
+                  type="button"
+                  disabled={actionLoadingId === c.id}
+                  onClick={() => handleRestore(c.id)}
+                  className="btn-secondary flex-1 sm:flex-initial text-xs !py-1.5 flex items-center justify-center gap-1 text-emerald-600 hover:bg-emerald-500/10"
+                >
+                  <CheckCircle className="h-3.5 w-3.5 text-emerald-600" />
+                  Restore as Genuine
+                </button>
+                <button
+                  type="button"
+                  disabled={actionLoadingId === c.id}
+                  onClick={() => handleDelete(c.id)}
+                  className="btn-secondary flex-1 sm:flex-initial text-xs !py-1.5 flex items-center justify-center gap-1 text-red-600 hover:bg-red-500/10"
+                >
+                  <Trash2 className="h-3.5 w-3.5 text-red-600" />
+                  Delete
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
       ) : (
         <>
           <div className="hidden md:block">

@@ -40,6 +40,24 @@ export const SubmissionSuccess: React.FC<SubmissionSuccessProps> = ({ complaint,
       </div>
 
       <div className="surface-card p-6 text-left">
+        {complaint.is_duplicate && (
+          <div
+            className="mb-6 rounded-[var(--radius)] border p-4 text-left flex items-start gap-3"
+            style={{
+              borderColor: 'color-mix(in srgb, #3b82f6 40%, transparent)',
+              backgroundColor: 'color-mix(in srgb, #3b82f6 8%, var(--color-background))',
+            }}
+          >
+            <div className="flex-1">
+              <p className="text-sm font-semibold flex items-center gap-1.5" style={{ color: '#2563eb' }}>
+                <span>ℹ️ Issue Already Registered for this Location</span>
+              </p>
+              <p className="mt-1 text-xs leading-relaxed" style={{ color: 'var(--color-text)' }}>
+                An active complaint {complaint.duplicate_of_id ? `[${complaint.duplicate_of_id}]` : ''} is already being tracked for this issue at <strong>{complaint.location}</strong>. We have linked your submission to boost its municipal dispatch priority!
+              </p>
+            </div>
+          </div>
+        )}
         <div
           className="mb-6 flex flex-wrap items-center gap-2 border-b pb-4"
           style={{ borderColor: 'var(--color-border)' }}

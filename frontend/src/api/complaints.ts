@@ -31,6 +31,13 @@ export const updateComplaintStatus = async (id: string, status: Complaint['statu
   });
 };
 
+export const deleteComplaint = async (id: string): Promise<{ success: boolean; message: string }> => {
+  if (isMockMode) return mockHandlers.deleteComplaint(id);
+  return apiClient<{ success: boolean; message: string }>(`/api/complaints/${id}`, {
+    method: 'DELETE',
+  });
+};
+
 export interface StatsResponse {
   total: number;
   by_status: Record<string, number>;

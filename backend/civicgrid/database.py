@@ -33,7 +33,9 @@ CREATE TABLE IF NOT EXISTS complaints (
     latitude          REAL,
     longitude         REAL,
     image_url         TEXT,
-    image_analysis    TEXT
+    image_analysis    TEXT,
+    is_duplicate      INTEGER DEFAULT 0,
+    duplicate_of_id   TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_complaints_status   ON complaints(status);
 CREATE INDEX IF NOT EXISTS idx_complaints_category ON complaints(category);
@@ -123,6 +125,8 @@ def init_db() -> None:
                     cur.execute("ALTER TABLE complaints ADD COLUMN IF NOT EXISTS longitude REAL;")
                     cur.execute("ALTER TABLE complaints ADD COLUMN IF NOT EXISTS image_url TEXT;")
                     cur.execute("ALTER TABLE complaints ADD COLUMN IF NOT EXISTS image_analysis TEXT;")
+                    cur.execute("ALTER TABLE complaints ADD COLUMN IF NOT EXISTS is_duplicate INTEGER DEFAULT 0;")
+                    cur.execute("ALTER TABLE complaints ADD COLUMN IF NOT EXISTS duplicate_of_id TEXT;")
                     _seed_officer(cur, is_pg=True)
                 conn.commit()
         else:
@@ -130,7 +134,7 @@ def init_db() -> None:
             try:
                 conn.executescript(_CREATE_TABLE_SQL)
                 # Migration for existing SQLite DBs
-                for col in ["latitude REAL", "longitude REAL", "image_url TEXT", "image_analysis TEXT"]:
+                for col in ["latitude REAL", "longitude REAL", "image_url TEXT", "image_analysis TEXT", "is_duplicate INTEGER DEFAULT 0", "duplicate_of_id TEXT"]:
                     try:
                         conn.execute(f"ALTER TABLE complaints ADD COLUMN {col}")
                     except sqlite3.OperationalError:
@@ -173,9 +177,12 @@ def insert_complaint(
     longitude: float | None = None,
     image_url: str | None = None,
     image_analysis: str | None = None,
+    is_duplicate: bool = False,
+    duplicate_of_id: str | None = None,
 ) -> dict[str, Any]:
     """Insert a new complaint and return the full record."""
     now = datetime.now(timezone.utc).isoformat()
+    is_dup_int = 1 if is_duplicate else 0
     with _lock:
         if _is_postgres():
             with _get_pg_conn() as conn:
@@ -186,8 +193,8 @@ def insert_complaint(
                         INSERT INTO complaints
                           (id, raw_text, category, subcategory, severity, urgency,
                            location, affected_facility, summary, status, created_at, updated_at,
-                           latitude, longitude, image_url, image_analysis)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                           latitude, longitude, image_url, image_analysis, is_duplicate, duplicate_of_id)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         RETURNING *
                         """,
                         (
@@ -207,6 +214,8 @@ def insert_complaint(
                             longitude,
                             image_url,
                             image_analysis,
+                            is_dup_int,
+                            duplicate_of_id,
                         ),
                     )
                     row = cur.fetchone()
@@ -221,8 +230,8 @@ def insert_complaint(
                     INSERT INTO complaints
                       (id, raw_text, category, subcategory, severity, urgency,
                        location, affected_facility, summary, status, created_at, updated_at,
-                       latitude, longitude, image_url, image_analysis)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                       latitude, longitude, image_url, image_analysis, is_duplicate, duplicate_of_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         complaint_id,
@@ -241,6 +250,8 @@ def insert_complaint(
                         longitude,
                         image_url,
                         image_analysis,
+                        is_dup_int,
+                        duplicate_of_id,
                     ),
                 )
                 conn.commit()
@@ -491,6 +502,49 @@ def update_officer_password(officer_id: str, old_password: str, new_password: st
                     "UPDATE officers SET password_hash = ? WHERE officer_id = ? AND password_hash = ?",
                     (new_hash, officer_id, old_hash),
                 )
+                conn.commit()
+                return cur.rowcount > 0
+            finally:
+                conn.close()
+
+
+def find_open_complaints_by_location_category(location: str, category: str) -> list[dict[str, Any]]:
+    """Fetch open, non-rejected complaints matching location and category for duplicate check."""
+    with _lock:
+        if _is_postgres():
+            with _get_pg_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "SELECT id, summary, raw_text, location, subcategory FROM complaints WHERE category = %s AND status != 'Rejected / Spam' AND status != 'Resolved' ORDER BY created_at DESC LIMIT 10",
+                        (category,),
+                    )
+                    return [dict(r) for r in cur.fetchall()]
+        else:
+            conn = _get_sqlite_conn()
+            try:
+                rows = conn.execute(
+                    "SELECT id, summary, raw_text, location, subcategory FROM complaints WHERE category = ? AND status != 'Rejected / Spam' AND status != 'Resolved' ORDER BY created_at DESC LIMIT 10",
+                    (category,),
+                ).fetchall()
+                return [dict(r) for r in rows]
+            finally:
+                conn.close()
+
+
+def delete_complaint(complaint_id: str) -> bool:
+    """Physically remove a complaint from the database."""
+    with _lock:
+        if _is_postgres():
+            with _get_pg_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("DELETE FROM complaints WHERE id = %s", (complaint_id,))
+                    deleted = cur.rowcount > 0
+                conn.commit()
+                return deleted
+        else:
+            conn = _get_sqlite_conn()
+            try:
+                cur = conn.execute("DELETE FROM complaints WHERE id = ?", (complaint_id,))
                 conn.commit()
                 return cur.rowcount > 0
             finally:

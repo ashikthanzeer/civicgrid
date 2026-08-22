@@ -36,3 +36,20 @@ If a photo is provided with the complaint, analyze the visual evidence in the im
 def build_extraction_prompt(complaint_text: str) -> str:
     """Build the model input while keeping extraction instructions centralized."""
     return f"{EXTRACTION_INSTRUCTIONS}\n\nCitizen complaint:\n{complaint_text}"
+
+
+DUPLICATE_CHECK_INSTRUCTIONS = """You are CivicGrid's AI duplicate complaint comparison engine.
+
+Compare the NEW citizen complaint against EXISTING candidate complaints at the same location.
+
+Rules:
+1. If the new complaint reports the EXACT SAME issue without any meaningful new details or updates, set `is_duplicate` to true, set `duplicate_of_id` to the matching complaint ID (e.g. COMP-2026-0001), and explain why.
+2. If the new complaint contains ADDITIONAL NEW INFORMATION (e.g., higher danger, exact landmark/pillar number, new visual proof, caused damage), or describes a DIFFERENT problem, set `is_duplicate` to false and `duplicate_of_id` to null.
+"""
+
+
+def build_duplicate_check_prompt(new_text: str, candidates: list[dict]) -> str:
+    candidates_str = "\n".join(
+        [f"- ID: {c['id']} | Location: {c.get('location')} | Summary: {c.get('summary')} | Details: {c.get('raw_text')}" for c in candidates]
+    )
+    return f"{DUPLICATE_CHECK_INSTRUCTIONS}\n\nEXISTING OPEN COMPLAINTS AT THIS LOCATION:\n{candidates_str}\n\nNEW CITIZEN SUBMISSION:\n{new_text}"

@@ -38,15 +38,16 @@ function computeTrend(complaints: Complaint[], filterFn?: (c: Complaint) => bool
 
 export const DashboardKpis: React.FC<DashboardKpisProps> = ({ complaints, loading }) => {
   const { t } = useI18n();
-  const total = complaints.length;
-  const urgent = complaints.filter((c) => c.urgency === 'Urgent' || c.urgency === 'Emergency').length;
-  const critical = complaints.filter((c) => c.severity === 'Critical').length;
-  const resolved = complaints.filter((c) => c.status === 'Resolved').length;
+  const genuineList = complaints.filter((c) => c.status !== 'Rejected / Spam' && c.category !== 'Spam / Invalid');
+  const total = genuineList.length;
+  const urgent = genuineList.filter((c) => c.urgency === 'Urgent' || c.urgency === 'Emergency').length;
+  const critical = genuineList.filter((c) => c.severity === 'Critical').length;
+  const resolved = genuineList.filter((c) => c.status === 'Resolved').length;
 
-  const totalTrend = computeTrend(complaints);
-  const urgentTrend = computeTrend(complaints, (c) => c.urgency === 'Urgent' || c.urgency === 'Emergency');
-  const criticalTrend = computeTrend(complaints, (c) => c.severity === 'Critical');
-  const resolvedTrend = computeTrend(complaints, (c) => c.status === 'Resolved');
+  const totalTrend = computeTrend(genuineList);
+  const urgentTrend = computeTrend(genuineList, (c) => c.urgency === 'Urgent' || c.urgency === 'Emergency');
+  const criticalTrend = computeTrend(genuineList, (c) => c.severity === 'Critical');
+  const resolvedTrend = computeTrend(genuineList, (c) => c.status === 'Resolved');
 
   return (
     <div className="surface-card p-6">
