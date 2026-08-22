@@ -108,18 +108,18 @@ const MapPage: React.FC = () => {
 
       {/* Map container */}
       {isLoading ? (
-        <div className="flex-1 min-h-[500px]">
+        <div className="h-[600px] w-full">
           <LoadingSkeleton variant="card" />
         </div>
       ) : (
         <div
-          className="flex-1 min-h-[500px] rounded-[var(--radius)] overflow-hidden"
-          style={{ border: '1px solid var(--color-border)' }}
+          className="h-[600px] w-full rounded-[var(--radius)] overflow-hidden"
+          style={{ border: '1px solid var(--color-border)', height: '600px' }}
         >
           <GoogleMapView
             complaints={allComplaints}
             fullScreen
-            height="100%"
+            height="600px"
           />
         </div>
       )}

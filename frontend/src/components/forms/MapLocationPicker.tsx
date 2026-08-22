@@ -292,7 +292,7 @@ export const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
         <Map
           defaultCenter={INDIA_CENTER}
           defaultZoom={5}
-          mapId="civicgrid-location-picker"
+          mapId="DEMO_MAP_ID"
           gestureHandling="greedy"
           disableDefaultUI
           zoomControl

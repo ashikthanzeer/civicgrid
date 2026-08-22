@@ -161,10 +161,10 @@ export const GoogleMapView: React.FC<GoogleMapProps> = ({
     <Map
       defaultCenter={INDIA_CENTER}
       defaultZoom={INDIA_ZOOM}
-      mapId="civicgrid-map"
+      mapId="DEMO_MAP_ID"
       gestureHandling="greedy"
       disableDefaultUI={false}
-      style={{ width: '100%', height: '100%' }}
+      style={{ width: '100%', height: '100%', minHeight: '500px' }}
     >
       {geoComplaints.map((c) => (
         <AdvancedMarker
@@ -191,7 +191,7 @@ export const GoogleMapView: React.FC<GoogleMapProps> = ({
   );
 
   if (fullScreen) {
-    return <div style={{ width: '100%', height: '100%' }}>{mapContent}</div>;
+    return <div style={{ width: '100%', height: height === '100%' ? '600px' : height, minHeight: '500px' }}>{mapContent}</div>;
   }
 
   return (
