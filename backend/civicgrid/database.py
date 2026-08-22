@@ -31,7 +31,9 @@ CREATE TABLE IF NOT EXISTS complaints (
     created_at        TEXT NOT NULL,
     updated_at        TEXT NOT NULL,
     latitude          REAL,
-    longitude         REAL
+    longitude         REAL,
+    image_url         TEXT,
+    image_analysis    TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_complaints_status   ON complaints(status);
 CREATE INDEX IF NOT EXISTS idx_complaints_category ON complaints(category);
@@ -80,20 +82,19 @@ def init_db() -> None:
                     cur.execute(_CREATE_TABLE_SQL)
                     cur.execute("ALTER TABLE complaints ADD COLUMN IF NOT EXISTS latitude REAL;")
                     cur.execute("ALTER TABLE complaints ADD COLUMN IF NOT EXISTS longitude REAL;")
+                    cur.execute("ALTER TABLE complaints ADD COLUMN IF NOT EXISTS image_url TEXT;")
+                    cur.execute("ALTER TABLE complaints ADD COLUMN IF NOT EXISTS image_analysis TEXT;")
                 conn.commit()
         else:
             conn = _get_sqlite_conn()
             try:
                 conn.executescript(_CREATE_TABLE_SQL)
                 # Migration for existing SQLite DBs
-                try:
-                    conn.execute("ALTER TABLE complaints ADD COLUMN latitude REAL")
-                except sqlite3.OperationalError:
-                    pass
-                try:
-                    conn.execute("ALTER TABLE complaints ADD COLUMN longitude REAL")
-                except sqlite3.OperationalError:
-                    pass
+                for col in ["latitude REAL", "longitude REAL", "image_url TEXT", "image_analysis TEXT"]:
+                    try:
+                        conn.execute(f"ALTER TABLE complaints ADD COLUMN {col}")
+                    except sqlite3.OperationalError:
+                        pass
                 conn.commit()
             finally:
                 conn.close()
@@ -128,6 +129,8 @@ def insert_complaint(
     summary: str,
     latitude: float | None = None,
     longitude: float | None = None,
+    image_url: str | None = None,
+    image_analysis: str | None = None,
 ) -> dict[str, Any]:
     """Insert a new complaint and return the full record."""
     now = datetime.now(timezone.utc).isoformat()
@@ -140,13 +143,15 @@ def insert_complaint(
                         """
                         INSERT INTO complaints
                           (id, raw_text, category, subcategory, severity, urgency,
-                           location, affected_facility, summary, status, created_at, updated_at, latitude, longitude)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 'New', %s, %s, %s, %s)
+                           location, affected_facility, summary, status, created_at, updated_at,
+                           latitude, longitude, image_url, image_analysis)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 'New', %s, %s, %s, %s, %s, %s)
                         RETURNING *
                         """,
                         (
                             complaint_id, raw_text, category, subcategory, severity, urgency,
-                            location, affected_facility, summary, now, now, latitude, longitude,
+                            location, affected_facility, summary, now, now,
+                            latitude, longitude, image_url, image_analysis,
                         ),
                     )
                     row = cur.fetchone()
@@ -160,12 +165,14 @@ def insert_complaint(
                     """
                     INSERT INTO complaints
                       (id, raw_text, category, subcategory, severity, urgency,
-                       location, affected_facility, summary, status, created_at, updated_at, latitude, longitude)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'New', ?, ?, ?, ?)
+                       location, affected_facility, summary, status, created_at, updated_at,
+                       latitude, longitude, image_url, image_analysis)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'New', ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         complaint_id, raw_text, category, subcategory, severity, urgency,
-                        location, affected_facility, summary, now, now, latitude, longitude,
+                        location, affected_facility, summary, now, now,
+                        latitude, longitude, image_url, image_analysis,
                     ),
                 )
                 conn.commit()

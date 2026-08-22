@@ -74,6 +74,10 @@ export const mockHandlers = {
       status: 'New',
       latitude: req.latitude ?? null,
       longitude: req.longitude ?? null,
+      image_url: req.image_b64 ?? null,
+      image_analysis: req.image_b64
+        ? 'Gemini Vision confirmed visual evidence matching reported issue in photo.'
+        : 'No photo provided',
     };
     inMemoryComplaints = [newComplaint, ...inMemoryComplaints];
     return { success: true, complaint: newComplaint };

@@ -41,3 +41,4 @@ class CivicComplaint(BaseModel):
     location: str
     affected_facility: str
     summary: str
+    image_analysis: str

@@ -6,6 +6,7 @@ import { SeverityBadge } from '../ui/SeverityBadge';
 import { UrgencyBadge } from '../ui/UrgencyBadge';
 import { CategoryBadge } from '../ui/CategoryBadge';
 import { StatusBadge } from '../ui/StatusBadge';
+import { TTSButton } from '../ui/TTSButton';
 import { updateComplaintStatus } from '../../api/complaints';
 import { STATUS_OPTIONS } from '../../utils/constants';
 import { useI18n } from '../../i18n/useI18n';
@@ -137,10 +138,13 @@ export const ComplaintDetails: React.FC<ComplaintDetailsProps> = ({ complaint: i
 
           {/* Citizen Report */}
           <section>
-            <h2 className="text-lg font-bold flex items-center gap-2 mb-4" style={{ color: 'var(--color-text)' }}>
-              <ShieldAlert className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
-              {t.details.citizenVoice}
-            </h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold flex items-center gap-2" style={{ color: 'var(--color-text)' }}>
+                <ShieldAlert className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
+                {t.details.citizenVoice}
+              </h2>
+              <TTSButton text={complaint.summary || complaint.raw_text} />
+            </div>
             <div
               className="rounded-xl p-6 relative overflow-hidden"
               style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
@@ -152,6 +156,33 @@ export const ComplaintDetails: React.FC<ComplaintDetailsProps> = ({ complaint: i
               <p className="text-base leading-relaxed italic pl-2" style={{ color: 'var(--color-text)' }}>
                 "{complaint.raw_text}"
               </p>
+
+              {(complaint.image_url || complaint.image_analysis) && (
+                <div
+                  className="mt-5 rounded-lg border p-4 text-left not-italic"
+                  style={{
+                    borderColor: 'color-mix(in srgb, var(--color-primary) 30%, transparent)',
+                    backgroundColor: 'color-mix(in srgb, var(--color-primary) 5%, transparent)',
+                  }}
+                >
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5" style={{ color: 'var(--color-primary)' }}>
+                    <span>📸 Gemini Multimodal Vision Analysis</span>
+                  </p>
+                  {complaint.image_url && (
+                    <img
+                      src={complaint.image_url}
+                      alt="Citizen photo evidence"
+                      className="mb-3 max-h-56 rounded-lg object-cover border"
+                      style={{ borderColor: 'var(--color-border)' }}
+                    />
+                  )}
+                  {complaint.image_analysis && (
+                    <p className="text-xs font-medium" style={{ color: 'var(--color-text)' }}>
+                      "{complaint.image_analysis}"
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           </section>
 

@@ -5,6 +5,7 @@ export interface SubmitComplaintRequest {
   location: string;
   latitude?: number | null;
   longitude?: number | null;
+  image_b64?: string | null;
 }
 
 export interface SubmitComplaintResponse {

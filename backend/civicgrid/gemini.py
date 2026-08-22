@@ -98,12 +98,27 @@ def _rate_limit_retry_delay_seconds(exc: errors.ClientError) -> float | None:
 def _generate_structured_content(
     client: genai.Client,
     complaint_text: str,
+    image_b64: str | None = None,
 ) -> Any:
+    contents: list[Any] = []
+    if image_b64:
+        import base64
+        b64_data = image_b64.split(",", 1)[1] if "," in image_b64 else image_b64
+        try:
+            image_bytes = base64.b64decode(b64_data)
+            contents.append(
+                types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg")
+            )
+        except Exception:
+            pass  # Fall back to text if b64 is malformed
+
+    contents.append(build_extraction_prompt(complaint_text))
+
     for attempt in range(3):
         try:
             return client.models.generate_content(
                 model=_get_model_name(),
-                contents=build_extraction_prompt(complaint_text),
+                contents=contents,
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
                     response_schema=_gemini_response_schema(),
@@ -126,12 +141,12 @@ def _generate_structured_content(
     raise GeminiExtractionError("Gemini complaint extraction retry did not complete.")
 
 
-def classify_complaint(text: str) -> CivicComplaint:
-    """Classify complaint text with Gemini and return a validated complaint."""
+def classify_complaint(text: str, image_b64: str | None = None) -> CivicComplaint:
+    """Classify complaint text and optional image with Gemini and return a validated complaint."""
     complaint_text = _validate_input(text)
     client = _create_client()
     try:
-        response = _generate_structured_content(client, complaint_text)
+        response = _generate_structured_content(client, complaint_text, image_b64)
     except errors.ClientError as exc:
         if exc.code == 429:
             raise GeminiExtractionError(

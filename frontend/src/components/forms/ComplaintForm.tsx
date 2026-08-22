@@ -1,6 +1,7 @@
 import React from 'react';
 import { AlertCircle, Mic } from 'lucide-react';
 import { MapLocationPicker } from './MapLocationPicker';
+import { PhotoUpload } from './PhotoUpload';
 import { AIProcessingSteps } from './AIProcessingSteps';
 import { VoiceInput } from '../ui/VoiceInput';
 import { useSubmitComplaint } from '../../hooks/useSubmitComplaint';
@@ -19,6 +20,7 @@ export const ComplaintForm: React.FC<ComplaintFormProps> = ({ onSuccess }) => {
   const [text, setText] = React.useState('');
   const [location, setLocation] = React.useState('');
   const [coords, setCoords] = React.useState<{ lat: number; lng: number } | null>(null);
+  const [imageB64, setImageB64] = React.useState<string | null>(null);
   const [touched, setTouched] = React.useState({ text: false, location: false });
   const [submitError, setSubmitError] = React.useState<string | null>(null);
   const [isFocused, setIsFocused] = React.useState(false);
@@ -51,6 +53,7 @@ export const ComplaintForm: React.FC<ComplaintFormProps> = ({ onSuccess }) => {
         location,
         latitude: coords?.lat ?? null,
         longitude: coords?.lng ?? null,
+        image_b64: imageB64,
       });
       onSuccess(result.complaint);
     } catch {
@@ -227,6 +230,9 @@ export const ComplaintForm: React.FC<ComplaintFormProps> = ({ onSuccess }) => {
           </p>
         )}
       </div>
+
+      {/* ── Photo Evidence (Multimodal Vision) ────────────────────── */}
+      <PhotoUpload onPhotoSelected={setImageB64} disabled={mutation.isPending} />
 
       {/* ── Submit error ───────────────────────────────────────────── */}
       {submitError && (

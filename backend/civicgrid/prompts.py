@@ -21,6 +21,8 @@ Urgency means how quickly authorities should respond. They are not synonyms.
 For example, a small pothole that has existed for months can be Medium severity
 and Soon urgency. A fallen live electrical wire near a school can be Critical
 severity and Emergency urgency.
+
+If a photo is provided with the complaint, analyze the visual evidence in the image and summarize what civic issue is visually confirmed in 1 concise sentence for `image_analysis`. If no photo is provided, set `image_analysis` to "No photo provided".
 """
 
 

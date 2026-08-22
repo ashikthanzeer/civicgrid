@@ -82,7 +82,7 @@ def submit_complaint(req: SubmitComplaintIn) -> SubmitComplaintResponse:
     """
     classifier = make_classifier()
     try:
-        classification = classifier.classify(req.text)
+        classification = classifier.classify(req.text, image_b64=req.image_b64)
     except ComplaintInputError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except GeminiConfigurationError as exc:
@@ -115,6 +115,8 @@ def submit_complaint(req: SubmitComplaintIn) -> SubmitComplaintResponse:
         summary=classification.summary,
         latitude=req.latitude,
         longitude=req.longitude,
+        image_url=req.image_b64 if req.image_b64 else None,
+        image_analysis=classification.image_analysis,
     )
     return SubmitComplaintResponse(success=True, complaint=ComplaintOut(**row))
 

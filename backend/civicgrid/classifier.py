@@ -16,16 +16,16 @@ from .schemas import CivicComplaint, ComplaintCategory, Severity, Urgency
 class Classifier(Protocol):
     """Classifies plain-text civic complaint into a structured CivicComplaint."""
 
-    def classify(self, text: str) -> CivicComplaint:
+    def classify(self, text: str, image_b64: str | None = None) -> CivicComplaint:
         ...
 
 
 class GeminiClassifier:
     """Production classifier backed by the Gemini API."""
 
-    def classify(self, text: str) -> CivicComplaint:
+    def classify(self, text: str, image_b64: str | None = None) -> CivicComplaint:
         from .gemini import classify_complaint
-        return classify_complaint(text)
+        return classify_complaint(text, image_b64)
 
 
 class MockClassifier:
@@ -36,10 +36,11 @@ class MockClassifier:
     as the summary. Category is always Other so tests can override easily.
     """
 
-    def classify(self, text: str) -> CivicComplaint:
+    def classify(self, text: str, image_b64: str | None = None) -> CivicComplaint:
         summary = text.strip()
         if len(summary) > 120:
             summary = summary[:117] + "..."
+        analysis = "Visual evidence confirmed via citizen photo upload." if image_b64 else "No photo provided"
         return CivicComplaint(
             category=ComplaintCategory.OTHER,
             subcategory="General Civic Issue",
@@ -48,6 +49,7 @@ class MockClassifier:
             location="Unknown",
             affected_facility="Unknown",
             summary=summary,
+            image_analysis=analysis,
         )
 
 

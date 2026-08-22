@@ -14,6 +14,7 @@ class SubmitComplaintIn(BaseModel):
     location: str = Field(min_length=1, max_length=100, description="Ward or location name")
     latitude: float | None = Field(default=None, description="Optional geographic latitude")
     longitude: float | None = Field(default=None, description="Optional geographic longitude")
+    image_b64: str | None = Field(default=None, description="Optional base64 image data for multimodal vision")
 
 
 class UpdateStatusIn(BaseModel):
@@ -35,6 +36,8 @@ class ComplaintOut(BaseModel):
     updated_at: str
     latitude: float | None = None
     longitude: float | None = None
+    image_url: str | None = None
+    image_analysis: str | None = None
 
 
 class SubmitComplaintResponse(BaseModel):

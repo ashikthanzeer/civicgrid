@@ -32,4 +32,6 @@ export interface Complaint {
   status: ComplaintStatus;
   latitude?: number | null;
   longitude?: number | null;
+  image_url?: string | null;
+  image_analysis?: string | null;
 }

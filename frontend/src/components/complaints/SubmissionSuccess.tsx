@@ -5,6 +5,7 @@ import type { Complaint } from '../../types/complaint';
 import { SeverityBadge } from '../ui/SeverityBadge';
 import { UrgencyBadge } from '../ui/UrgencyBadge';
 import { CategoryBadge } from '../ui/CategoryBadge';
+import { TTSButton } from '../ui/TTSButton';
 import { useI18n } from '../../i18n/useI18n';
 
 interface SubmissionSuccessProps {
@@ -106,12 +107,42 @@ export const SubmissionSuccess: React.FC<SubmissionSuccessProps> = ({ complaint,
             className="mt-6 rounded-[var(--radius)] border p-4"
             style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-background)' }}
           >
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-muted)' }}>
-              {t.submit.extractedSummary}
-            </p>
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-muted)' }}>
+                {t.submit.extractedSummary}
+              </p>
+              <TTSButton text={complaint.summary} />
+            </div>
             <p className="text-sm leading-relaxed" style={{ color: 'var(--color-text)' }}>
               {complaint.summary}
             </p>
+          </div>
+        )}
+
+        {(complaint.image_url || complaint.image_analysis) && (
+          <div
+            className="mt-4 rounded-[var(--radius)] border p-4"
+            style={{
+              borderColor: 'color-mix(in srgb, var(--color-primary) 30%, transparent)',
+              backgroundColor: 'color-mix(in srgb, var(--color-primary) 4%, var(--color-background))',
+            }}
+          >
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5" style={{ color: 'var(--color-primary)' }}>
+              <span>📸 Gemini Vision Analysis</span>
+            </p>
+            {complaint.image_url && (
+              <img
+                src={complaint.image_url}
+                alt="Attached visual evidence"
+                className="mb-3 max-h-48 rounded-lg object-cover border"
+                style={{ borderColor: 'var(--color-border)' }}
+              />
+            )}
+            {complaint.image_analysis && (
+              <p className="text-xs italic" style={{ color: 'var(--color-text)' }}>
+                "{complaint.image_analysis}"
+              </p>
+            )}
           </div>
         )}
       </div>
