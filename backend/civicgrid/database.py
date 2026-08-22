@@ -344,7 +344,12 @@ def list_complaints(
                 with conn.cursor() as cur:
                     cur.execute(f"SELECT COUNT(*) FROM complaints {where}", params)
                     count_row = cur.fetchone()
-                    total = list(count_row.values())[0] if isinstance(count_row, dict) else count_row[0]
+                    if not count_row:
+                        total = 0
+                    elif isinstance(count_row, dict):
+                        total = list(count_row.values())[0]
+                    else:
+                        total = count_row[0]
 
                     query_sql = f"SELECT * FROM complaints {where} ORDER BY {order} LIMIT %s OFFSET %s"
                     cur.execute(query_sql, params + [limit, skip])
@@ -353,14 +358,15 @@ def list_complaints(
         else:
             conn = _get_sqlite_conn()
             try:
-                total = conn.execute(
+                c_row = conn.execute(
                     f"SELECT COUNT(*) FROM complaints {where}", params
-                ).fetchone()[0]
+                ).fetchone()
+                total = c_row[0] if c_row else 0
                 rows = conn.execute(
                     f"SELECT * FROM complaints {where} ORDER BY {order} LIMIT ? OFFSET ?",
                     params + [limit, skip],
                 ).fetchall()
-                return [dict(r) for r in rows], total
+                return [dict(r) for r in rows], int(total)
             finally:
                 conn.close()
 

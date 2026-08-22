@@ -171,25 +171,48 @@ def get_stats() -> StatsResponse:
 
 def _clean_complaint(row: dict) -> ComplaintOut:
     """Safely sanitize database row to prevent Pydantic 422 validation errors."""
-    cleaned = dict(row)
+    try:
+        cleaned = dict(row)
 
-    # Safely cast latitude / longitude
-    for coord in ("latitude", "longitude"):
-        val = cleaned.get(coord)
-        if val is not None:
-            try:
-                cleaned[coord] = float(val)
-            except (ValueError, TypeError):
+        # Safely cast latitude / longitude
+        for coord in ("latitude", "longitude"):
+            val = cleaned.get(coord)
+            if val is not None:
+                try:
+                    cleaned[coord] = float(val)
+                except (ValueError, TypeError):
+                    cleaned[coord] = None
+            else:
                 cleaned[coord] = None
-        else:
-            cleaned[coord] = None
 
-    # Remove None values for string fields so Pydantic schema defaults kick in
-    for k in list(cleaned.keys()):
-        if cleaned[k] is None and k not in ("latitude", "longitude", "image_url", "image_analysis"):
-            del cleaned[k]
+        # Safely cast citizen_reports_count to int
+        try:
+            cleaned["citizen_reports_count"] = int(cleaned.get("citizen_reports_count") or 1)
+        except (ValueError, TypeError):
+            cleaned["citizen_reports_count"] = 1
 
-    return ComplaintOut(**cleaned)
+        # Remove None values for string fields so Pydantic schema defaults kick in
+        for k in list(cleaned.keys()):
+            if cleaned[k] is None and k not in ("latitude", "longitude", "image_url", "image_analysis", "duplicate_of_id"):
+                del cleaned[k]
+
+        return ComplaintOut(**cleaned)
+    except Exception as exc:
+        logger.warning("Failed to clean complaint row %s: %s", row.get("id"), exc)
+        return ComplaintOut(
+            id=str(row.get("id", "COMP-2026-0000")),
+            raw_text=str(row.get("raw_text", "")),
+            category=str(row.get("category", "Other")),
+            subcategory=str(row.get("subcategory", "General Civic Issue")),
+            severity="Medium",
+            urgency="Routine",
+            location=str(row.get("location", "Unknown")),
+            affected_facility=str(row.get("affected_facility", "Unknown")),
+            summary=str(row.get("summary", "")),
+            status=str(row.get("status", "New")),
+            created_at=str(row.get("created_at", "")),
+            updated_at=str(row.get("updated_at", "")),
+        )
 
 
 def _to_list(val: list[str] | str | None) -> list[str] | None:
