@@ -72,6 +72,8 @@ export const mockHandlers = {
       created_at: now,
       updated_at: now,
       status: 'New',
+      latitude: req.latitude ?? null,
+      longitude: req.longitude ?? null,
     };
     inMemoryComplaints = [newComplaint, ...inMemoryComplaints];
     return { success: true, complaint: newComplaint };

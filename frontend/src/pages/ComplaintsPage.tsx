@@ -7,7 +7,7 @@ import { ComplaintCard } from '../components/complaints/ComplaintCard';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ErrorState } from '../components/ui/ErrorState';
 import { LoadingSkeleton } from '../components/ui/LoadingSkeleton';
-import { CATEGORIES, SEVERITY_LEVELS, URGENCY_LEVELS, WARDS } from '../utils/constants';
+import { CATEGORIES, SEVERITY_LEVELS, URGENCY_LEVELS } from '../utils/constants';
 import type { Complaint, Severity, Urgency } from '../types/complaint';
 import type { ExplorerSort } from '../types/filters';
 import { useI18n } from '../i18n/useI18n';
@@ -54,6 +54,14 @@ const ComplaintsPage: React.FC = () => {
     if (location.length) list = list.filter((c) => location.includes(c.location));
     return applySort(list, sort);
   }, [data, search, category, severity, urgency, location, sort]);
+
+  const locationOptions = useMemo(
+    () =>
+      Array.from(new Set((data?.complaints ?? []).map((c) => c.location).filter(Boolean))).map(
+        (loc) => ({ value: loc, label: loc }),
+      ),
+    [data],
+  );
 
   const hasFilters = search || category.length || severity.length || urgency.length || location.length;
   const clearAll = () => {
@@ -146,7 +154,7 @@ const ComplaintsPage: React.FC = () => {
             mode="multiple"
             value={location}
             onChange={setLocation}
-            options={WARDS.map((w) => ({ value: w, label: w }))}
+            options={locationOptions}
             placeholder={t.complaints.allLocations}
             className="min-w-[140px]"
             maxTagCount={1}

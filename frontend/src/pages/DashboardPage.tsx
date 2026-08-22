@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useComplaints } from '../hooks/useComplaints';
 import { DashboardKpis } from '../components/dashboard/DashboardKpis';
 import { DashboardFilters } from '../components/dashboard/DashboardFilters';
 import { RecentComplaints } from '../components/dashboard/RecentComplaints';
-import { CivicMap } from '../components/complaints/CivicMap';
+import { GoogleMapView } from '../components/complaints/GoogleMap';
 import { ErrorState } from '../components/ui/ErrorState';
 import { LoadingSkeleton } from '../components/ui/LoadingSkeleton';
 import type { ComplaintFilters } from '../types/filters';
@@ -34,6 +34,11 @@ const DashboardPage: React.FC = () => {
     (c) => c.severity === 'Critical' || c.urgency === 'Emergency',
   ).length;
 
+  const availableLocations = useMemo(
+    () => Array.from(new Set((data?.complaints ?? []).map((c) => c.location).filter(Boolean))),
+    [data?.complaints],
+  );
+
   if (isError) {
     return <ErrorState message={t.common.error} onRetry={() => refetch()} />;
   }
@@ -56,12 +61,12 @@ const DashboardPage: React.FC = () => {
         </button>
       </div>
 
-      <DashboardFilters filters={filters} onChange={setFilters} />
+      <DashboardFilters filters={filters} onChange={setFilters} availableLocations={availableLocations} />
 
       <DashboardKpis complaints={filtered} loading={isLoading} />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <CivicMap totalComplaints={filtered.length} highPriorityCount={highPriority} />
+        <GoogleMapView complaints={filtered} highPriorityCount={highPriority} />
 
         <div className="surface-card p-6">
           {isLoading ? (

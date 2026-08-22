@@ -33,6 +33,7 @@ export const bn: TranslationDictionary = {
     dashboard: 'ড্যাশবোর্ড',
     analytics: 'বিশ্লেষণ',
     complaints: 'অভিযোগসমূহ',
+    map: 'মানচিত্র',
     settings: 'সেটিংস',
     brandSubtitle: 'নাগরিক ইন্টেলিজেন্স',
   },

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Select, DatePicker } from 'antd';
 import { X, SlidersHorizontal } from 'lucide-react';
-import { CATEGORIES, WARDS, SEVERITY_LEVELS, URGENCY_LEVELS } from '../../utils/constants';
+import { CATEGORIES, SEVERITY_LEVELS, URGENCY_LEVELS } from '../../utils/constants';
 import type { ComplaintFilters } from '../../types/filters';
 
 const { RangePicker } = DatePicker;
@@ -9,6 +9,7 @@ const { RangePicker } = DatePicker;
 interface DashboardFiltersProps {
   filters: ComplaintFilters;
   onChange: (filters: ComplaintFilters) => void;
+  availableLocations?: string[];
 }
 
 const hasActiveFilters = (f: ComplaintFilters) =>
@@ -19,7 +20,7 @@ const hasActiveFilters = (f: ComplaintFilters) =>
   !!f.dateFrom ||
   !!f.dateTo;
 
-export const DashboardFilters: React.FC<DashboardFiltersProps> = ({ filters, onChange }) => {
+export const DashboardFilters: React.FC<DashboardFiltersProps> = ({ filters, onChange, availableLocations }) => {
   const [expanded, setExpanded] = useState(false);
   const active = hasActiveFilters(filters);
 
@@ -119,8 +120,8 @@ export const DashboardFilters: React.FC<DashboardFiltersProps> = ({ filters, onC
               mode="multiple"
               value={filters.locations ?? []}
               onChange={(v) => onChange({ ...filters, locations: v })}
-              options={WARDS.map((w) => ({ value: w, label: w }))}
-              placeholder="All wards"
+              options={(availableLocations ?? []).map((loc: string) => ({ value: loc, label: loc }))}
+              placeholder="All locations"
               size="small"
               className="w-full"
               maxTagCount="responsive"

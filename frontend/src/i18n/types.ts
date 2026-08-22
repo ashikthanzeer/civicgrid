@@ -41,6 +41,7 @@ export interface TranslationDictionary {
     dashboard: string;
     analytics: string;
     complaints: string;
+    map: string;
     settings: string;
     brandSubtitle: string;
   };

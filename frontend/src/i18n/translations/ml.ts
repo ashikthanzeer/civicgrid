@@ -33,6 +33,7 @@ export const ml: TranslationDictionary = {
     dashboard: 'ഡാഷ്‌ബോർഡ്',
     analytics: 'അനലിറ്റിക്സ്',
     complaints: 'പരാതികൾ',
+    map: 'മാപ്പ്',
     settings: 'ക്രമീകരണങ്ങൾ',
     brandSubtitle: 'സിവിക് ഇന്റലിജൻസ്',
   },

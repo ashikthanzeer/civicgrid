@@ -30,4 +30,6 @@ export interface Complaint {
   created_at: string;
   updated_at: string;
   status: ComplaintStatus;
+  latitude?: number | null;
+  longitude?: number | null;
 }

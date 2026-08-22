@@ -33,6 +33,7 @@ export const ta: TranslationDictionary = {
     dashboard: 'டாஷ்போர்டு',
     analytics: 'பகுப்பாய்வு',
     complaints: 'புகார்கள்',
+    map: 'வரைபடம்',
     settings: 'அமைப்புகள்',
     brandSubtitle: 'குடிமை நுண்ணறிவு',
   },

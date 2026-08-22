@@ -33,6 +33,7 @@ export const mr: TranslationDictionary = {
     dashboard: 'डॅशबोर्ड',
     analytics: 'विश्लेषण',
     complaints: 'तक्रारी',
+    map: 'नकाशा',
     settings: 'सेटिंग्ज',
     brandSubtitle: 'नागरी बुद्धिमत्ता',
   },

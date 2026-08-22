@@ -3,6 +3,8 @@ import type { Complaint } from './complaint';
 export interface SubmitComplaintRequest {
   text: string;
   location: string;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 export interface SubmitComplaintResponse {

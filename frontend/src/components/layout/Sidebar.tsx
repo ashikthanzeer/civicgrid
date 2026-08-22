@@ -8,11 +8,12 @@ import {
   List,
   Settings,
   Grid3X3,
+  MapPinned,
 } from 'lucide-react';
 import { useI18n } from '../../i18n/useI18n';
 
 export interface NavItemDef {
-  key: 'home' | 'submit' | 'dashboard' | 'analytics' | 'complaints' | 'settings';
+  key: 'home' | 'submit' | 'dashboard' | 'analytics' | 'complaints' | 'map' | 'settings';
   path: string;
   icon: typeof Home;
   end: boolean;
@@ -24,6 +25,7 @@ export const navItemDefs: NavItemDef[] = [
   { key: 'dashboard', path: '/dashboard', icon: LayoutDashboard, end: false },
   { key: 'analytics', path: '/analytics', icon: BarChart3, end: false },
   { key: 'complaints', path: '/complaints', icon: List, end: false },
+  { key: 'map', path: '/map', icon: MapPinned, end: false },
   { key: 'settings', path: '/settings', icon: Settings, end: false },
 ];
 

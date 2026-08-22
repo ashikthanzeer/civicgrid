@@ -1,6 +1,6 @@
 import React from 'react';
 import { AlertCircle, Mic } from 'lucide-react';
-import { LocationSelector } from './LocationSelector';
+import { MapLocationPicker } from './MapLocationPicker';
 import { AIProcessingSteps } from './AIProcessingSteps';
 import { VoiceInput } from '../ui/VoiceInput';
 import { useSubmitComplaint } from '../../hooks/useSubmitComplaint';
@@ -18,6 +18,7 @@ export const ComplaintForm: React.FC<ComplaintFormProps> = ({ onSuccess }) => {
   const { t } = useI18n();
   const [text, setText] = React.useState('');
   const [location, setLocation] = React.useState('');
+  const [coords, setCoords] = React.useState<{ lat: number; lng: number } | null>(null);
   const [touched, setTouched] = React.useState({ text: false, location: false });
   const [submitError, setSubmitError] = React.useState<string | null>(null);
   const [isFocused, setIsFocused] = React.useState(false);
@@ -45,7 +46,12 @@ export const ComplaintForm: React.FC<ComplaintFormProps> = ({ onSuccess }) => {
     if (!isValid) return;
     setSubmitError(null);
     try {
-      const result = await mutation.mutateAsync({ text, location });
+      const result = await mutation.mutateAsync({
+        text,
+        location,
+        latitude: coords?.lat ?? null,
+        longitude: coords?.lng ?? null,
+      });
       onSuccess(result.complaint);
     } catch {
       setSubmitError(t.submit.errorSubmit);
@@ -201,10 +207,11 @@ export const ComplaintForm: React.FC<ComplaintFormProps> = ({ onSuccess }) => {
             backgroundColor: 'var(--color-background)',
           }}
         >
-          <LocationSelector
+          <MapLocationPicker
             value={location}
-            onChange={(v) => {
+            onChange={(v, lat, lng) => {
               setLocation(v);
+              if (lat != null && lng != null) setCoords({ lat, lng });
               setTouched((prev) => ({ ...prev, location: true }));
             }}
             disabled={mutation.isPending}

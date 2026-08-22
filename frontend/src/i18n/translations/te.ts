@@ -33,8 +33,9 @@ export const te: TranslationDictionary = {
     dashboard: 'డ్యాష్‌బోర్డ్',
     analytics: 'విశ్లేషణలు',
     complaints: 'ఫిర్యాదులు',
+    map: 'మ్యాప్',
     settings: 'సెట్టింగ్‌లు',
-    brandSubtitle: 'పౌర ఇంటెలిజెన్స్',
+    brandSubtitle: 'సివిక్ ఇంటెలిజెన్స్',
   },
   topbar: {
     reportIssue: 'ఫిర్యాదు చేయండి',

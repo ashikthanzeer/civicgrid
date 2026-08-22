@@ -33,6 +33,7 @@ export const en: TranslationDictionary = {
     dashboard: 'Dashboard',
     analytics: 'Analytics',
     complaints: 'Complaints',
+    map: 'Map View',
     settings: 'Settings',
     brandSubtitle: 'Civic Intelligence',
   },

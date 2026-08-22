@@ -113,6 +113,8 @@ def submit_complaint(req: SubmitComplaintIn) -> SubmitComplaintResponse:
         location=location,
         affected_facility=classification.affected_facility,
         summary=classification.summary,
+        latitude=req.latitude,
+        longitude=req.longitude,
     )
     return SubmitComplaintResponse(success=True, complaint=ComplaintOut(**row))
 

@@ -13,6 +13,7 @@ import AnalyticsPage from './pages/AnalyticsPage';
 import ComplaintsPage from './pages/ComplaintsPage';
 import SubmitComplaintPage from './pages/SubmitComplaintPage';
 import ComplaintDetailsPage from './pages/ComplaintDetailsPage';
+import MapPage from './pages/MapPage';
 import SettingsPage from './pages/SettingsPage';
 
 const queryClient = new QueryClient();
@@ -72,6 +73,7 @@ function AppContent() {
               <Route path="/complaints" element={<ComplaintsPage />} />
               <Route path="/complaints/:id" element={<ComplaintDetailsPage />} />
               <Route path="/submit" element={<SubmitComplaintPage />} />
+              <Route path="/map" element={<MapPage />} />
               <Route path="/settings" element={<SettingsPage />} />
             </Route>
           </Routes>

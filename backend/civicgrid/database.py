@@ -29,7 +29,9 @@ CREATE TABLE IF NOT EXISTS complaints (
     summary           TEXT NOT NULL,
     status            TEXT NOT NULL DEFAULT 'New',
     created_at        TEXT NOT NULL,
-    updated_at        TEXT NOT NULL
+    updated_at        TEXT NOT NULL,
+    latitude          REAL,
+    longitude         REAL
 );
 CREATE INDEX IF NOT EXISTS idx_complaints_status   ON complaints(status);
 CREATE INDEX IF NOT EXISTS idx_complaints_category ON complaints(category);
@@ -76,11 +78,22 @@ def init_db() -> None:
             with _get_pg_conn() as conn:
                 with conn.cursor() as cur:
                     cur.execute(_CREATE_TABLE_SQL)
+                    cur.execute("ALTER TABLE complaints ADD COLUMN IF NOT EXISTS latitude REAL;")
+                    cur.execute("ALTER TABLE complaints ADD COLUMN IF NOT EXISTS longitude REAL;")
                 conn.commit()
         else:
             conn = _get_sqlite_conn()
             try:
                 conn.executescript(_CREATE_TABLE_SQL)
+                # Migration for existing SQLite DBs
+                try:
+                    conn.execute("ALTER TABLE complaints ADD COLUMN latitude REAL")
+                except sqlite3.OperationalError:
+                    pass
+                try:
+                    conn.execute("ALTER TABLE complaints ADD COLUMN longitude REAL")
+                except sqlite3.OperationalError:
+                    pass
                 conn.commit()
             finally:
                 conn.close()
@@ -113,6 +126,8 @@ def insert_complaint(
     location: str,
     affected_facility: str,
     summary: str,
+    latitude: float | None = None,
+    longitude: float | None = None,
 ) -> dict[str, Any]:
     """Insert a new complaint and return the full record."""
     now = datetime.now(timezone.utc).isoformat()
@@ -125,13 +140,13 @@ def insert_complaint(
                         """
                         INSERT INTO complaints
                           (id, raw_text, category, subcategory, severity, urgency,
-                           location, affected_facility, summary, status, created_at, updated_at)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 'New', %s, %s)
+                           location, affected_facility, summary, status, created_at, updated_at, latitude, longitude)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 'New', %s, %s, %s, %s)
                         RETURNING *
                         """,
                         (
                             complaint_id, raw_text, category, subcategory, severity, urgency,
-                            location, affected_facility, summary, now, now,
+                            location, affected_facility, summary, now, now, latitude, longitude,
                         ),
                     )
                     row = cur.fetchone()
@@ -145,12 +160,12 @@ def insert_complaint(
                     """
                     INSERT INTO complaints
                       (id, raw_text, category, subcategory, severity, urgency,
-                       location, affected_facility, summary, status, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'New', ?, ?)
+                       location, affected_facility, summary, status, created_at, updated_at, latitude, longitude)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'New', ?, ?, ?, ?)
                     """,
                     (
                         complaint_id, raw_text, category, subcategory, severity, urgency,
-                        location, affected_facility, summary, now, now,
+                        location, affected_facility, summary, now, now, latitude, longitude,
                     ),
                 )
                 conn.commit()

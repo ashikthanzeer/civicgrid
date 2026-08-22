@@ -33,6 +33,7 @@ export const kn: TranslationDictionary = {
     dashboard: 'ಡ್ಯಾಶ್‌ಬೋರ್ಡ್',
     analytics: 'ವಿಶ್ಲೇಷಣೆ',
     complaints: 'ದೂರುಗಳು',
+    map: 'ನಕ್ಷೆ',
     settings: 'ಸೆಟ್ಟಿಂಗ್‌ಗಳು',
     brandSubtitle: 'ನಾಗರಿಕ ಇಂಟೆಲಿಜೆನ್ಸ್',
   },
