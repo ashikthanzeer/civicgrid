@@ -142,9 +142,34 @@ def get_stats() -> StatsResponse:
 
 
 def _clean_complaint(row: dict) -> ComplaintOut:
-    """Strip None values for non-optional fields so Pydantic defaults apply cleanly."""
-    cleaned = {k: v for k, v in row.items() if v is not None}
+    """Safely sanitize database row to prevent Pydantic 422 validation errors."""
+    cleaned = dict(row)
+
+    # Safely cast latitude / longitude
+    for coord in ("latitude", "longitude"):
+        val = cleaned.get(coord)
+        if val is not None:
+            try:
+                cleaned[coord] = float(val)
+            except (ValueError, TypeError):
+                cleaned[coord] = None
+        else:
+            cleaned[coord] = None
+
+    # Remove None values for string fields so Pydantic schema defaults kick in
+    for k in list(cleaned.keys()):
+        if cleaned[k] is None and k not in ("latitude", "longitude", "image_url", "image_analysis"):
+            del cleaned[k]
+
     return ComplaintOut(**cleaned)
+
+
+def _to_list(val: list[str] | str | None) -> list[str] | None:
+    if val is None or val == "":
+        return None
+    if isinstance(val, str):
+        return [s.strip() for s in val.split(",") if s.strip()]
+    return val
 
 
 @app.get(
@@ -154,20 +179,20 @@ def _clean_complaint(row: dict) -> ComplaintOut:
     tags=["complaints"],
 )
 def list_complaints(
-    status: Annotated[list[str] | None, Query(default=None, description="Filter by status")] = None,
-    category: Annotated[list[str] | None, Query(default=None, description="Filter by category")] = None,
-    severity: Annotated[list[str] | None, Query(default=None, description="Filter by severity")] = None,
-    location: Annotated[list[str] | None, Query(default=None, description="Filter by location")] = None,
+    status: Annotated[list[str] | str | None, Query(default=None, description="Filter by status")] = None,
+    category: Annotated[list[str] | str | None, Query(default=None, description="Filter by category")] = None,
+    severity: Annotated[list[str] | str | None, Query(default=None, description="Filter by severity")] = None,
+    location: Annotated[list[str] | str | None, Query(default=None, description="Filter by location")] = None,
     search: Annotated[str | None, Query(default=None, description="Full-text search")] = None,
     sort: Annotated[str, Query(default="newest", description="newest|oldest|highest_severity|highest_urgency")] = "newest",
     skip: Annotated[int, Query(default=0, ge=0)] = 0,
     limit: Annotated[int, Query(default=100, ge=1, le=500)] = 100,
 ) -> ListComplaintsResponse:
     rows, total = db.list_complaints(
-        status=status,
-        category=category,
-        severity=severity,
-        location=location,
+        status=_to_list(status),
+        category=_to_list(category),
+        severity=_to_list(severity),
+        location=_to_list(location),
         search=search,
         sort=sort,
         skip=skip,
