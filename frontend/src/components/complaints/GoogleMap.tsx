@@ -41,7 +41,7 @@ function SeverityDot({ severity }: { severity: string }) {
 /** Info window content for a complaint */
 function ComplaintInfo({ complaint }: { complaint: Complaint }) {
   return (
-    <div style={{ maxWidth: 280, fontFamily: "'IBM Plex Sans', sans-serif" }}>
+    <div style={{ maxWidth: 280, fontFamily: "'IBM Plex Sans', sans-serif", color: 'var(--color-text)' }}>
       <div
         style={{
           display: 'flex',
@@ -59,29 +59,32 @@ function ComplaintInfo({ complaint }: { complaint: Complaint }) {
             backgroundColor: SEVERITY_COLORS[complaint.severity as Severity] ?? '#94a3b8',
           }}
         />
-        <strong style={{ fontSize: 13 }}>{complaint.category}</strong>
+        <strong style={{ fontSize: 13, color: 'var(--color-text)' }}>{complaint.category}</strong>
         <span
           style={{
             fontSize: 11,
-            padding: '1px 6px',
+            padding: '2px 7px',
             borderRadius: 4,
-            backgroundColor: '#f1f5f9',
-            color: '#64748b',
+            backgroundColor: 'var(--color-elevated)',
+            color: 'var(--color-muted)',
+            fontWeight: 600,
           }}
         >
           {complaint.status}
         </span>
       </div>
-      <p style={{ fontSize: 12, color: '#334155', margin: '4px 0 8px' }}>{complaint.summary}</p>
-      <div style={{ display: 'flex', gap: 12, fontSize: 11, color: '#64748b' }}>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-          <MapPin size={11} /> {complaint.location}
+      <p style={{ fontSize: 12, color: 'var(--color-text)', margin: '4px 0 8px', lineHeight: 1.4 }}>
+        {complaint.summary}
+      </p>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, fontSize: 11, color: 'var(--color-muted)' }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 3, color: 'var(--color-muted)' }}>
+          <MapPin size={11} style={{ color: 'var(--color-muted)' }} /> {complaint.location}
         </span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-          <Tag size={11} /> {complaint.severity}
+        <span style={{ display: 'flex', alignItems: 'center', gap: 3, color: 'var(--color-muted)' }}>
+          <Tag size={11} style={{ color: 'var(--color-muted)' }} /> {complaint.severity}
         </span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-          <Clock size={11} /> {new Date(complaint.created_at).toLocaleDateString()}
+        <span style={{ display: 'flex', alignItems: 'center', gap: 3, color: 'var(--color-muted)' }}>
+          <Clock size={11} style={{ color: 'var(--color-muted)' }} /> {new Date(complaint.created_at).toLocaleDateString()}
         </span>
       </div>
     </div>

@@ -60,8 +60,8 @@ const MapPage: React.FC = () => {
             <span
               className="rounded-full px-2.5 py-1 text-xs font-semibold"
               style={{
-                backgroundColor: 'color-mix(in srgb, #22c55e 12%, transparent)',
-                color: '#16a34a',
+                backgroundColor: 'color-mix(in srgb, var(--color-success) 12%, transparent)',
+                color: 'var(--color-success)',
               }}
             >
               {geoComplaints.length} mapped
