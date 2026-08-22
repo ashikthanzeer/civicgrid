@@ -6,10 +6,12 @@ import { LoadingSkeleton } from '../components/ui/LoadingSkeleton';
 import { ErrorState } from '../components/ui/ErrorState';
 import { ArrowLeft, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useI18n } from '../i18n/useI18n';
 
 const ComplaintDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { t } = useI18n();
   const { data, isLoading, isError, refetch, error } = useComplaint(id ?? '');
 
   if (isLoading) {
@@ -34,10 +36,10 @@ const ComplaintDetailsPage: React.FC = () => {
           </div>
           <div>
             <h2 className="text-base font-semibold" style={{ color: 'var(--color-text)' }}>
-              Complaint not found
+              {t.details.notFoundTitle}
             </h2>
             <p className="text-sm mt-1" style={{ color: 'var(--color-muted)' }}>
-              The complaint ID "{id}" does not exist.
+              {t.details.notFoundDesc}
             </p>
           </div>
           <button
@@ -50,12 +52,12 @@ const ComplaintDetailsPage: React.FC = () => {
             }}
           >
             <ArrowLeft className="w-4 h-4" />
-            Back to Complaints
+            {t.details.backLink}
           </button>
         </div>
       );
     }
-    return <ErrorState message="We couldn't load this complaint." onRetry={() => refetch()} />;
+    return <ErrorState message={t.common.error} onRetry={() => refetch()} />;
   }
 
   if (!data) return null;

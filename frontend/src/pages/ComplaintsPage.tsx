@@ -10,6 +10,7 @@ import { LoadingSkeleton } from '../components/ui/LoadingSkeleton';
 import { CATEGORIES, SEVERITY_LEVELS, URGENCY_LEVELS, WARDS } from '../utils/constants';
 import type { Complaint, Severity, Urgency } from '../types/complaint';
 import type { ExplorerSort } from '../types/filters';
+import { useI18n } from '../i18n/useI18n';
 
 const SEVERITY_RANK: Record<Severity, number> = { Low: 1, Medium: 2, High: 3, Critical: 4 };
 const URGENCY_RANK: Record<Urgency, number> = { Routine: 1, Soon: 2, Urgent: 3, Emergency: 4 };
@@ -31,6 +32,7 @@ function applySort(list: Complaint[], sort: ExplorerSort): Complaint[] {
 
 const ComplaintsPage: React.FC = () => {
   const { data, isLoading, isError, refetch } = useComplaints();
+  const { t } = useI18n();
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState<string[]>([]);
   const [severity, setSeverity] = useState<string[]>([]);
@@ -65,9 +67,9 @@ const ComplaintsPage: React.FC = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-display text-3xl font-bold tracking-tight">Complaints</h1>
+        <h1 className="font-display text-3xl font-bold tracking-tight">{t.complaints.pageTitle}</h1>
         <p className="mt-2 text-sm" style={{ color: 'var(--color-muted)' }}>
-          Search and explore citizen-reported civic issues.
+          {t.complaints.pageSubtitle}
         </p>
       </div>
 
@@ -79,7 +81,7 @@ const ComplaintsPage: React.FC = () => {
             </div>
             <input
               type="search"
-              placeholder="Search by keyword or summary..."
+              placeholder={t.complaints.searchPlaceholder}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               aria-label="Search complaints"
@@ -91,10 +93,10 @@ const ComplaintsPage: React.FC = () => {
             value={sort}
             onChange={(v) => setSort(v as ExplorerSort)}
             options={[
-              { value: 'newest', label: 'Newest First' },
-              { value: 'oldest', label: 'Oldest First' },
-              { value: 'highest_severity', label: 'Highest Severity' },
-              { value: 'highest_urgency', label: 'Highest Urgency' },
+              { value: 'newest', label: t.complaints.sortNewest },
+              { value: 'oldest', label: t.complaints.sortOldest },
+              { value: 'highest_severity', label: t.complaints.sortSeverity },
+              { value: 'highest_urgency', label: t.complaints.sortUrgency },
             ]}
             size="large"
             className="w-full sm:w-56"
@@ -108,14 +110,14 @@ const ComplaintsPage: React.FC = () => {
           style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
         >
           <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-muted)' }}>
-            Filters
+            {t.common.filter}
           </span>
           <Select
             mode="multiple"
             value={category}
             onChange={setCategory}
             options={CATEGORIES.map((c) => ({ value: c, label: c }))}
-            placeholder="Category"
+            placeholder={t.complaints.allCategories}
             className="min-w-[140px]"
             maxTagCount={1}
             aria-label="Filter by category"
@@ -125,7 +127,7 @@ const ComplaintsPage: React.FC = () => {
             value={severity}
             onChange={setSeverity}
             options={SEVERITY_LEVELS.map((s) => ({ value: s, label: s }))}
-            placeholder="Severity"
+            placeholder={t.complaints.allSeverities}
             className="min-w-[140px]"
             maxTagCount={1}
             aria-label="Filter by severity"
@@ -135,7 +137,7 @@ const ComplaintsPage: React.FC = () => {
             value={urgency}
             onChange={setUrgency}
             options={URGENCY_LEVELS.map((u) => ({ value: u, label: u }))}
-            placeholder="Urgency"
+            placeholder={t.common.urgent}
             className="min-w-[140px]"
             maxTagCount={1}
             aria-label="Filter by urgency"
@@ -145,14 +147,14 @@ const ComplaintsPage: React.FC = () => {
             value={location}
             onChange={setLocation}
             options={WARDS.map((w) => ({ value: w, label: w }))}
-            placeholder="Location"
+            placeholder={t.complaints.allLocations}
             className="min-w-[140px]"
             maxTagCount={1}
             aria-label="Filter by location"
           />
           {hasFilters && (
             <button type="button" onClick={clearAll} className="btn-secondary ml-auto !px-3 !py-1.5 text-xs">
-              Clear filters
+              {t.common.reset}
             </button>
           )}
         </div>
@@ -160,12 +162,12 @@ const ComplaintsPage: React.FC = () => {
 
       {!isLoading && !isError && (
         <p className="text-xs" style={{ color: 'var(--color-muted)' }}>
-          Showing {filtered.length} of {data?.complaints.length ?? 0} complaints
+          {filtered.length} {t.complaints.resultsCount}
         </p>
       )}
 
       {isError ? (
-        <ErrorState message="We couldn't load the complaints." onRetry={() => refetch()} />
+        <ErrorState message={t.common.error} onRetry={() => refetch()} />
       ) : isLoading ? (
         <div className="space-y-2">
           {[...Array(6)].map((_, i) => (
@@ -174,9 +176,9 @@ const ComplaintsPage: React.FC = () => {
         </div>
       ) : filtered.length === 0 ? (
         <EmptyState
-          title="No complaints match your filters"
-          description="Try adjusting your search or clearing the active filters."
-          action={hasFilters ? { label: 'Clear Filters', onClick: clearAll } : undefined}
+          title={t.complaints.emptyTitle}
+          description={t.complaints.emptyDesc}
+          action={hasFilters ? { label: t.common.reset, onClick: clearAll } : undefined}
         />
       ) : (
         <>

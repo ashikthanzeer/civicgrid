@@ -5,6 +5,7 @@ import type { Complaint } from '../../types/complaint';
 import { SeverityBadge } from '../ui/SeverityBadge';
 import { UrgencyBadge } from '../ui/UrgencyBadge';
 import { CategoryBadge } from '../ui/CategoryBadge';
+import { useI18n } from '../../i18n/useI18n';
 
 interface SubmissionSuccessProps {
   complaint: Complaint;
@@ -13,6 +14,7 @@ interface SubmissionSuccessProps {
 
 export const SubmissionSuccess: React.FC<SubmissionSuccessProps> = ({ complaint, onReset }) => {
   const navigate = useNavigate();
+  const { t } = useI18n();
 
   return (
     <div className="space-y-8 text-center">
@@ -28,10 +30,10 @@ export const SubmissionSuccess: React.FC<SubmissionSuccessProps> = ({ complaint,
         </div>
         <div>
           <h2 className="font-display text-2xl font-bold" style={{ color: 'var(--color-success)' }}>
-            Report submitted
+            {t.submit.successTitle}
           </h2>
           <p className="mx-auto mt-2 max-w-md text-sm" style={{ color: 'var(--color-muted)' }}>
-            Your report has been processed and routed to the relevant department.
+            {t.submit.successSubtitle}
           </p>
         </div>
       </div>
@@ -42,7 +44,7 @@ export const SubmissionSuccess: React.FC<SubmissionSuccessProps> = ({ complaint,
           style={{ borderColor: 'var(--color-border)' }}
         >
           <h3 className="text-lg font-semibold" style={{ color: 'var(--color-text)' }}>
-            Issue details
+            {t.submit.formTitle}
           </h3>
           <span
             className="ml-auto rounded-[var(--radius)] border px-2 py-1 text-xs font-medium"
@@ -52,7 +54,7 @@ export const SubmissionSuccess: React.FC<SubmissionSuccessProps> = ({ complaint,
               backgroundColor: 'var(--color-background)',
             }}
           >
-            ID: {complaint.id.split('-')[0]}
+            {t.submit.complaintId}: {complaint.id.split('-')[0]}
           </span>
         </div>
 
@@ -65,7 +67,7 @@ export const SubmissionSuccess: React.FC<SubmissionSuccessProps> = ({ complaint,
         <div className="grid grid-cols-2 gap-x-4 gap-y-5">
           <div>
             <p className="mb-1 text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-muted)' }}>
-              Category
+              {t.submit.assignedCategory}
             </p>
             <p className="text-sm font-medium" style={{ color: 'var(--color-text)' }}>
               {complaint.category}
@@ -81,7 +83,7 @@ export const SubmissionSuccess: React.FC<SubmissionSuccessProps> = ({ complaint,
           </div>
           <div className="col-span-2 sm:col-span-1">
             <p className="mb-1 text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-muted)' }}>
-              Location
+              {t.submit.locationLabel}
             </p>
             <p className="text-sm" style={{ color: 'var(--color-text)' }}>
               {complaint.location}
@@ -90,7 +92,7 @@ export const SubmissionSuccess: React.FC<SubmissionSuccessProps> = ({ complaint,
           {complaint.affected_facility && (
             <div className="col-span-2 sm:col-span-1">
               <p className="mb-1 text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-muted)' }}>
-                Affected facility
+                {t.details.facilityLabel}
               </p>
               <p className="text-sm" style={{ color: 'var(--color-text)' }}>
                 {complaint.affected_facility}
@@ -105,7 +107,7 @@ export const SubmissionSuccess: React.FC<SubmissionSuccessProps> = ({ complaint,
             style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-background)' }}
           >
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-muted)' }}>
-              Summary
+              {t.submit.extractedSummary}
             </p>
             <p className="text-sm leading-relaxed" style={{ color: 'var(--color-text)' }}>
               {complaint.summary}
@@ -117,11 +119,11 @@ export const SubmissionSuccess: React.FC<SubmissionSuccessProps> = ({ complaint,
       <div className="flex flex-col gap-3 sm:flex-row">
         <button type="button" onClick={() => navigate('/dashboard')} className="btn-primary flex-1">
           <LayoutDashboard className="h-4 w-4" />
-          Go to Dashboard
+          {t.landing.viewDashboardCta}
         </button>
         <button type="button" onClick={onReset} className="btn-secondary flex-1">
           <RotateCcw className="h-4 w-4" />
-          Report Another Issue
+          {t.submit.submitAnother}
         </button>
       </div>
     </div>

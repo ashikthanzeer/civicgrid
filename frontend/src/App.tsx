@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { ConfigProvider, theme as antTheme } from 'antd';
 import { ThemeProvider } from './theme/ThemeProvider';
 import { useTheme } from './theme/useTheme';
+import { I18nProvider } from './i18n/I18nProvider';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { lightTokens, darkTokens, radius } from './theme/tokens';
 
@@ -83,7 +84,9 @@ function AppContent() {
 function App() {
   return (
     <ThemeProvider>
-      <AppContent />
+      <I18nProvider>
+        <AppContent />
+      </I18nProvider>
     </ThemeProvider>
   );
 }

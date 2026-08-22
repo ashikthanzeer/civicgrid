@@ -5,8 +5,9 @@ import { AIProcessingSteps } from './AIProcessingSteps';
 import { VoiceInput } from '../ui/VoiceInput';
 import { useSubmitComplaint } from '../../hooks/useSubmitComplaint';
 import type { Complaint } from '../../types/complaint';
+import { useI18n } from '../../i18n/useI18n';
 
-const MIN_LENGTH = 20;
+const MIN_LENGTH = 10;
 const MAX_LENGTH = 2000;
 
 interface ComplaintFormProps {
@@ -14,6 +15,7 @@ interface ComplaintFormProps {
 }
 
 export const ComplaintForm: React.FC<ComplaintFormProps> = ({ onSuccess }) => {
+  const { t } = useI18n();
   const [text, setText] = React.useState('');
   const [location, setLocation] = React.useState('');
   const [touched, setTouched] = React.useState({ text: false, location: false });
@@ -26,16 +28,15 @@ export const ComplaintForm: React.FC<ComplaintFormProps> = ({ onSuccess }) => {
 
   const textError =
     touched.text && text.length < MIN_LENGTH
-      ? `Please describe the issue in at least ${MIN_LENGTH} characters.`
+      ? t.submit.validationMinLength
       : null;
-  const locationError = touched.location && !location ? 'Please select a location.' : null;
+  const locationError = touched.location && !location ? t.submit.locationHelp : null;
   const isValid = text.length >= MIN_LENGTH && !!location;
 
   // Append voice transcript into the text area
   const handleTranscript = (transcript: string) => {
     setText(transcript);
-    setTouched((t) => ({ ...t, text: true }));
-    // Switch back to text mode so the user can edit
+    setTouched((prev) => ({ ...prev, text: true }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -47,9 +48,7 @@ export const ComplaintForm: React.FC<ComplaintFormProps> = ({ onSuccess }) => {
       const result = await mutation.mutateAsync({ text, location });
       onSuccess(result.complaint);
     } catch {
-      setSubmitError(
-        "We couldn't submit your complaint. Please check your connection and try again.",
-      );
+      setSubmitError(t.submit.errorSubmit);
     }
   };
 
@@ -69,7 +68,7 @@ export const ComplaintForm: React.FC<ComplaintFormProps> = ({ onSuccess }) => {
             className="block text-sm font-semibold"
             style={{ color: 'var(--color-text)' }}
           >
-            Issue description <span style={{ color: 'var(--color-danger)' }}>*</span>
+            {t.submit.rawTextLabel} <span style={{ color: 'var(--color-danger)' }}>*</span>
           </label>
 
           {/* Text / Voice toggle */}
@@ -119,7 +118,7 @@ export const ComplaintForm: React.FC<ComplaintFormProps> = ({ onSuccess }) => {
             }}
           >
             <p className="mb-3 text-xs" style={{ color: 'var(--color-muted)' }}>
-              Select your language and press <strong>Speak</strong>. Your words will appear in the text area below.
+              {t.submit.voiceInputHelper}
             </p>
             <VoiceInput
               onTranscript={handleTranscript}
@@ -148,12 +147,12 @@ export const ComplaintForm: React.FC<ComplaintFormProps> = ({ onSuccess }) => {
             onFocus={() => setIsFocused(true)}
             onBlur={() => {
               setIsFocused(false);
-              setTouched((t) => ({ ...t, text: true }));
+              setTouched((prev) => ({ ...prev, text: true }));
             }}
             placeholder={
               inputMode === 'voice'
-                ? 'Your voice transcription will appear here. You can edit it.'
-                : 'Describe the issue in your own words…'
+                ? t.submit.voiceInputHelper
+                : t.submit.rawTextPlaceholder
             }
             maxLength={MAX_LENGTH}
             rows={6}
@@ -193,7 +192,7 @@ export const ComplaintForm: React.FC<ComplaintFormProps> = ({ onSuccess }) => {
       {/* ── Location ───────────────────────────────────────────────── */}
       <div className="space-y-2">
         <label className="block text-sm font-semibold" style={{ color: 'var(--color-text)' }}>
-          Location <span style={{ color: 'var(--color-danger)' }}>*</span>
+          {t.submit.locationLabel} <span style={{ color: 'var(--color-danger)' }}>*</span>
         </label>
         <div
           className="rounded-xl border p-4"
@@ -206,7 +205,7 @@ export const ComplaintForm: React.FC<ComplaintFormProps> = ({ onSuccess }) => {
             value={location}
             onChange={(v) => {
               setLocation(v);
-              setTouched((t) => ({ ...t, location: true }));
+              setTouched((prev) => ({ ...prev, location: true }));
             }}
             disabled={mutation.isPending}
           />
@@ -241,7 +240,7 @@ export const ComplaintForm: React.FC<ComplaintFormProps> = ({ onSuccess }) => {
       )}
 
       <button type="submit" disabled={mutation.isPending} className="btn-primary w-full">
-        Submit Report
+        {mutation.isPending ? t.submit.submittingBtn : t.submit.submitBtn}
       </button>
     </form>
   );

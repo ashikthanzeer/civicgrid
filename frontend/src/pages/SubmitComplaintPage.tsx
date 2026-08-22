@@ -2,9 +2,11 @@ import React from 'react';
 import { ComplaintForm } from '../components/forms/ComplaintForm';
 import { SubmissionSuccess } from '../components/complaints/SubmissionSuccess';
 import type { Complaint } from '../types/complaint';
+import { useI18n } from '../i18n/useI18n';
 
 const SubmitComplaintPage: React.FC = () => {
   const [submitted, setSubmitted] = React.useState<Complaint | null>(null);
+  const { t } = useI18n();
 
   const handleReset = () => setSubmitted(null);
 
@@ -15,10 +17,9 @@ const SubmitComplaintPage: React.FC = () => {
       ) : (
         <div className="space-y-8">
           <div>
-            <h1 className="font-display text-3xl font-bold tracking-tight">Report an Issue</h1>
+            <h1 className="font-display text-3xl font-bold tracking-tight">{t.submit.pageTitle}</h1>
             <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--color-muted)' }}>
-              Describe the problem in your own words. CivicGrid will structure and route your report
-              to the appropriate department.
+              {t.submit.pageSubtitle}
             </p>
           </div>
 

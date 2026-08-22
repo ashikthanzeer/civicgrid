@@ -1,19 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import { CheckCircle2, Circle, Cpu } from 'lucide-react';
-
-const STEPS = [
-  { id: 1, label: 'Reading your report' },
-  { id: 2, label: 'Understanding the issue' },
-  { id: 3, label: 'Classifying category and priority' },
-  { id: 4, label: 'Preparing for routing' },
-];
+import { useI18n } from '../../i18n/useI18n';
 
 interface AIProcessingStepsProps {
   isComplete?: boolean;
 }
 
 export const AIProcessingSteps: React.FC<AIProcessingStepsProps> = ({ isComplete = false }) => {
+  const { t } = useI18n();
   const [currentStep, setCurrentStep] = useState(1);
+
+  const steps = [
+    { id: 1, label: t.submit.aiStep1 },
+    { id: 2, label: t.submit.aiStep2 },
+    { id: 3, label: t.submit.aiStep3 },
+    { id: 4, label: t.submit.aiStep4 },
+  ];
 
   useEffect(() => {
     if (isComplete) {
@@ -50,12 +52,12 @@ export const AIProcessingSteps: React.FC<AIProcessingStepsProps> = ({ isComplete
           <Cpu className="h-6 w-6" />
         </div>
         <p className="text-sm font-medium" style={{ color: 'var(--color-text)' }}>
-          Processing your report…
+          {t.submit.submittingBtn}
         </p>
       </div>
 
       <ul className="mx-auto max-w-sm space-y-3">
-        {STEPS.map((step) => {
+        {steps.map((step) => {
           const done = currentStep > step.id;
           const active = currentStep === step.id;
           return (

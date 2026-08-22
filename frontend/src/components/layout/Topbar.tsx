@@ -2,6 +2,8 @@ import React from 'react';
 import { Menu, X, Grid3X3, PlusCircle } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { ThemeToggle } from '../ui/ThemeToggle';
+import { LanguageSelector } from '../ui/LanguageSelector';
+import { useI18n } from '../../i18n/useI18n';
 
 interface TopbarProps {
   onMenuClick: () => void;
@@ -11,6 +13,7 @@ interface TopbarProps {
 export const Topbar: React.FC<TopbarProps> = ({ onMenuClick, menuOpen = false }) => {
   const location = useLocation();
   const isSubmitPage = location.pathname === '/submit';
+  const { t } = useI18n();
 
   return (
     <header
@@ -35,7 +38,7 @@ export const Topbar: React.FC<TopbarProps> = ({ onMenuClick, menuOpen = false })
               ? 'color-mix(in srgb, var(--color-primary) 10%, transparent)'
               : 'var(--color-background)',
           }}
-          aria-label={menuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+          aria-label={menuOpen ? t.topbar.menuClose : t.topbar.menuOpen}
           aria-expanded={menuOpen}
           aria-controls="nav-drawer"
         >
@@ -71,10 +74,11 @@ export const Topbar: React.FC<TopbarProps> = ({ onMenuClick, menuOpen = false })
             }}
           >
             <PlusCircle className="h-3.5 w-3.5" />
-            Report Issue
+            {t.topbar.reportIssue}
           </Link>
         )}
 
+        <LanguageSelector />
         <ThemeToggle />
       </div>
     </header>

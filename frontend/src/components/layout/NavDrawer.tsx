@@ -1,7 +1,8 @@
 import React, { useEffect } from 'react';
 import { X, Grid3X3 } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
-import { navItems } from './Sidebar';
+import { navItemDefs } from './Sidebar';
+import { useI18n } from '../../i18n/useI18n';
 
 interface NavDrawerProps {
   isOpen: boolean;
@@ -9,6 +10,8 @@ interface NavDrawerProps {
 }
 
 export const NavDrawer: React.FC<NavDrawerProps> = ({ isOpen, onClose }) => {
+  const { t } = useI18n();
+
   useEffect(() => {
     if (!isOpen) return;
 
@@ -78,7 +81,7 @@ export const NavDrawer: React.FC<NavDrawerProps> = ({ isOpen, onClose }) => {
                 CivicGrid
               </span>
               <p className="text-[10px] font-medium uppercase tracking-wider" style={{ color: 'var(--color-muted)' }}>
-                Civic Intelligence
+                {t.nav.brandSubtitle}
               </p>
             </div>
           </div>
@@ -92,7 +95,7 @@ export const NavDrawer: React.FC<NavDrawerProps> = ({ isOpen, onClose }) => {
               color: 'var(--color-muted)',
               backgroundColor: 'var(--color-background)',
             }}
-            aria-label="Close navigation"
+            aria-label={t.topbar.menuClose}
           >
             <X className="h-4 w-4" />
           </button>
@@ -100,8 +103,9 @@ export const NavDrawer: React.FC<NavDrawerProps> = ({ isOpen, onClose }) => {
 
         {/* Navigation links */}
         <nav className="flex-1 space-y-1.5 overflow-y-auto p-4" aria-label="Mobile Navigation">
-          {navItems.map((item) => {
+          {navItemDefs.map((item) => {
             const Icon = item.icon;
+            const label = t.nav[item.key];
             return (
               <NavLink
                 key={item.path}
@@ -122,7 +126,7 @@ export const NavDrawer: React.FC<NavDrawerProps> = ({ isOpen, onClose }) => {
                 })}
               >
                 <Icon className="h-4 w-4 shrink-0" aria-hidden />
-                {item.name}
+                {label}
               </NavLink>
             );
           })}

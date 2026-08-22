@@ -8,6 +8,7 @@ import { CategoryBadge } from '../ui/CategoryBadge';
 import { StatusBadge } from '../ui/StatusBadge';
 import { updateComplaintStatus } from '../../api/complaints';
 import { STATUS_OPTIONS } from '../../utils/constants';
+import { useI18n } from '../../i18n/useI18n';
 
 interface ComplaintDetailsProps {
   complaint: Complaint;
@@ -27,6 +28,7 @@ function formatFullDate(dateStr: string): string {
 
 export const ComplaintDetails: React.FC<ComplaintDetailsProps> = ({ complaint: initialComplaint }) => {
   const navigate = useNavigate();
+  const { t } = useI18n();
   const [complaint, setComplaint] = useState(initialComplaint);
   const [copied, setCopied] = useState(false);
   const [updating, setUpdating] = useState(false);
@@ -46,7 +48,7 @@ export const ComplaintDetails: React.FC<ComplaintDetailsProps> = ({ complaint: i
       const updated = await updateComplaintStatus(complaint.id, newStatus);
       setComplaint(updated);
     } catch {
-      setUpdateError('Status update failed. Please try again.');
+      setUpdateError(t.common.error);
     } finally {
       setUpdating(false);
     }
@@ -65,7 +67,7 @@ export const ComplaintDetails: React.FC<ComplaintDetailsProps> = ({ complaint: i
           aria-label="Back to complaints list"
         >
           <ArrowLeft className="w-4 h-4" />
-          Back to Complaints
+          {t.details.backLink}
         </button>
         <div
           className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b pb-4"
@@ -76,7 +78,7 @@ export const ComplaintDetails: React.FC<ComplaintDetailsProps> = ({ complaint: i
               {complaint.id}
             </p>
             <h1 className="font-display text-3xl font-bold tracking-tight" style={{ color: 'var(--color-text)' }}>
-              Complaint details
+              {t.details.complaintHeader}
             </h1>
           </div>
           <div className="flex items-center gap-3">
@@ -94,7 +96,9 @@ export const ComplaintDetails: React.FC<ComplaintDetailsProps> = ({ complaint: i
             style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
           >
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--color-muted)' }}>Identifier</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--color-muted)' }}>
+                {t.submit.complaintId}
+              </p>
               <div className="flex items-center gap-2">
                 <span className="font-mono font-medium text-sm" style={{ color: 'var(--color-text)' }}>
                   {complaint.id}
@@ -112,14 +116,18 @@ export const ComplaintDetails: React.FC<ComplaintDetailsProps> = ({ complaint: i
               </div>
             </div>
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--color-muted)' }}>Submitted</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--color-muted)' }}>
+                {t.details.submittedOn}
+              </p>
               <p className="font-medium" style={{ color: 'var(--color-text)' }}>
                 {formatFullDate(complaint.created_at)}
               </p>
             </div>
             {complaint.updated_at !== complaint.created_at && (
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--color-muted)' }}>Last updated</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--color-muted)' }}>
+                  {t.details.statusLabel}
+                </p>
                 <p className="font-medium" style={{ color: 'var(--color-text)' }}>
                   {formatFullDate(complaint.updated_at)}
                 </p>
@@ -131,7 +139,7 @@ export const ComplaintDetails: React.FC<ComplaintDetailsProps> = ({ complaint: i
           <section>
             <h2 className="text-lg font-bold flex items-center gap-2 mb-4" style={{ color: 'var(--color-text)' }}>
               <ShieldAlert className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
-              Original report
+              {t.details.citizenVoice}
             </h2>
             <div
               className="rounded-xl p-6 relative overflow-hidden"
@@ -151,7 +159,7 @@ export const ComplaintDetails: React.FC<ComplaintDetailsProps> = ({ complaint: i
           <section>
             <h2 className="text-lg font-bold flex items-center gap-2 mb-4" style={{ color: 'var(--color-text)' }}>
               <Navigation className="w-5 h-5" style={{ color: 'var(--color-success)' }} />
-              Status timeline
+              {t.analytics.statusDistribution}
             </h2>
             <div
               className="rounded-xl p-4 sm:p-6"
@@ -201,14 +209,14 @@ export const ComplaintDetails: React.FC<ComplaintDetailsProps> = ({ complaint: i
           {/* Admin: Update Status */}
           <section>
             <h2 className="text-lg font-bold flex items-center gap-2 mb-4" style={{ color: 'var(--color-text)' }}>
-              Update Status
+              {t.details.updateStatusTitle}
             </h2>
             <div
               className="rounded-xl p-5"
               style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
             >
               <p className="mb-3 text-sm" style={{ color: 'var(--color-muted)' }}>
-                Move this complaint to a new status:
+                {t.details.updateStatusTitle}:
               </p>
               <div className="flex flex-wrap gap-2">
                 {STATUS_OPTIONS.map((status) => (
@@ -251,12 +259,14 @@ export const ComplaintDetails: React.FC<ComplaintDetailsProps> = ({ complaint: i
             >
               <Bot className="h-5 w-5" style={{ color: 'var(--color-primary)' }} />
               <h2 className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>
-                AI classification
+                {t.details.aiAnalysis}
               </h2>
             </div>
             <div className="space-y-5 p-5">
               <div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-muted)' }}>Category</p>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-muted)' }}>
+                  {t.submit.assignedCategory}
+                </p>
                 <div className="flex flex-col gap-2">
                   <CategoryBadge category={complaint.category} />
                   <span className="text-sm font-medium pl-1" style={{ color: 'var(--color-text)' }}>{complaint.subcategory}</span>
@@ -264,7 +274,9 @@ export const ComplaintDetails: React.FC<ComplaintDetailsProps> = ({ complaint: i
               </div>
 
               <div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-muted)' }}>Priority</p>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-muted)' }}>
+                  {t.submit.assignedSeverity} / {t.submit.assignedUrgency}
+                </p>
                 <div className="flex gap-2">
                   <SeverityBadge severity={complaint.severity} />
                   <UrgencyBadge urgency={complaint.urgency} />
@@ -272,14 +284,16 @@ export const ComplaintDetails: React.FC<ComplaintDetailsProps> = ({ complaint: i
               </div>
 
               <div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-muted)' }}>Location</p>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-muted)' }}>
+                  {t.submit.locationLabel}
+                </p>
                 <div className="flex items-start gap-2">
                   <MapPin className="mt-0.5 h-4 w-4 shrink-0" style={{ color: 'var(--color-primary)' }} />
                   <div>
                     <p className="text-sm font-medium" style={{ color: 'var(--color-text)' }}>{complaint.location}</p>
                     {complaint.affected_facility && complaint.affected_facility !== 'Unknown' && (
                       <p className="mt-1 text-xs" style={{ color: 'var(--color-muted)' }}>
-                        Facility: {complaint.affected_facility}
+                        {t.details.facilityLabel}: {complaint.affected_facility}
                       </p>
                     )}
                   </div>
@@ -288,7 +302,9 @@ export const ComplaintDetails: React.FC<ComplaintDetailsProps> = ({ complaint: i
 
               {complaint.summary && (
                 <div className="border-t pt-4" style={{ borderColor: 'var(--color-border)' }}>
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-muted)' }}>Summary</p>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-muted)' }}>
+                    {t.submit.extractedSummary}
+                  </p>
                   <p className="text-sm leading-relaxed" style={{ color: 'var(--color-text)' }}>{complaint.summary}</p>
                 </div>
               )}

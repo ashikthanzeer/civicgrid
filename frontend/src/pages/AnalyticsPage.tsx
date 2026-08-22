@@ -9,6 +9,7 @@ import { LoadingSkeleton } from '../components/ui/LoadingSkeleton';
 import type { ComplaintFilters } from '../types/filters';
 import type { Complaint } from '../types/complaint';
 import { RefreshCw } from 'lucide-react';
+import { useI18n } from '../i18n/useI18n';
 
 function applyFilters(complaints: Complaint[], f: ComplaintFilters): Complaint[] {
   return complaints.filter((c) => {
@@ -22,18 +23,15 @@ function applyFilters(complaints: Complaint[], f: ComplaintFilters): Complaint[]
   });
 }
 
-/**
- * Analytics page — charts and distribution views.
- * Previously unreachable: Sidebar linked to /analytics with no matching route.
- */
 const AnalyticsPage: React.FC = () => {
   const { data, isLoading, isError, refetch } = useComplaints();
   const [filters, setFilters] = useState<ComplaintFilters>({});
+  const { t } = useI18n();
 
   const filtered = applyFilters(data?.complaints ?? [], filters);
 
   if (isError) {
-    return <ErrorState message="We couldn't load analytics." onRetry={() => refetch()} />;
+    return <ErrorState message={t.common.error} onRetry={() => refetch()} />;
   }
 
   return (
@@ -42,14 +40,14 @@ const AnalyticsPage: React.FC = () => {
         style={{ borderColor: 'var(--color-border)' }}
       >
         <div>
-          <h1 className="font-display text-3xl font-bold tracking-tight">Analytics</h1>
+          <h1 className="font-display text-3xl font-bold tracking-tight">{t.analytics.pageTitle}</h1>
           <p className="mt-2 text-sm" style={{ color: 'var(--color-muted)' }}>
-            Category, severity, and urgency distributions across civic reports.
+            {t.analytics.pageSubtitle}
           </p>
         </div>
         <button type="button" onClick={() => refetch()} className="btn-secondary" aria-label="Refresh analytics">
           <RefreshCw className="h-4 w-4" />
-          Refresh
+          {t.common.retry}
         </button>
       </div>
 
@@ -65,19 +63,19 @@ const AnalyticsPage: React.FC = () => {
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <div className="surface-card p-6">
             <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide" style={{ color: 'var(--color-muted)' }}>
-              By Category
+              {t.dashboard.chartCategory}
             </h2>
             <CategoryChart complaints={filtered} />
           </div>
           <div className="surface-card p-6">
             <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide" style={{ color: 'var(--color-muted)' }}>
-              Severity
+              {t.dashboard.chartSeverity}
             </h2>
             <SeverityChart complaints={filtered} />
           </div>
           <div className="surface-card p-6">
             <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide" style={{ color: 'var(--color-muted)' }}>
-              Urgency
+              {t.dashboard.chartUrgency}
             </h2>
             <UrgencyChart complaints={filtered} />
           </div>

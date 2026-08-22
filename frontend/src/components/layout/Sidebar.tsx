@@ -9,15 +9,23 @@ import {
   Settings,
   Grid3X3,
 } from 'lucide-react';
+import { useI18n } from '../../i18n/useI18n';
 
-export const navItems = [
-  { name: 'Home', path: '/', icon: Home, end: true },
-  { name: 'Report an Issue', path: '/submit', icon: FilePlus2, end: false },
-  { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, end: false },
-  { name: 'Analytics', path: '/analytics', icon: BarChart3, end: false },
-  { name: 'Complaints', path: '/complaints', icon: List, end: false },
-  { name: 'Settings', path: '/settings', icon: Settings, end: false },
-] as const;
+export interface NavItemDef {
+  key: 'home' | 'submit' | 'dashboard' | 'analytics' | 'complaints' | 'settings';
+  path: string;
+  icon: typeof Home;
+  end: boolean;
+}
+
+export const navItemDefs: NavItemDef[] = [
+  { key: 'home', path: '/', icon: Home, end: true },
+  { key: 'submit', path: '/submit', icon: FilePlus2, end: false },
+  { key: 'dashboard', path: '/dashboard', icon: LayoutDashboard, end: false },
+  { key: 'analytics', path: '/analytics', icon: BarChart3, end: false },
+  { key: 'complaints', path: '/complaints', icon: List, end: false },
+  { key: 'settings', path: '/settings', icon: Settings, end: false },
+];
 
 interface SidebarProps {
   className?: string;
@@ -25,6 +33,8 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ className = '', onNavigate }) => {
+  const { t } = useI18n();
+
   return (
     <aside className={`flex h-full w-full flex-col ${className}`} style={{ backgroundColor: 'var(--color-surface)' }}>
       <div
@@ -39,13 +49,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ className = '', onNavigate }) 
         </div>
         <div>
           <span className="font-display text-base font-bold" style={{ color: 'var(--color-text)' }}>CivicGrid</span>
-          <p className="text-[10px] font-medium uppercase tracking-wider" style={{ color: 'var(--color-muted)' }}>Civic Intelligence</p>
+          <p className="text-[10px] font-medium uppercase tracking-wider" style={{ color: 'var(--color-muted)' }}>
+            {t.nav.brandSubtitle}
+          </p>
         </div>
       </div>
 
       <nav className="flex-1 space-y-1 overflow-y-auto p-4" aria-label="Primary">
-        {navItems.map((item) => {
+        {navItemDefs.map((item) => {
           const Icon = item.icon;
+          const label = t.nav[item.key];
           return (
             <NavLink
               key={item.path}
@@ -66,7 +79,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ className = '', onNavigate }) 
               })}
             >
               <Icon className="h-4 w-4 shrink-0" aria-hidden />
-              {item.name}
+              {label}
             </NavLink>
           );
         })}

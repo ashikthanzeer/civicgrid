@@ -6,6 +6,7 @@ import type { Complaint } from '../../types/complaint';
 import { SeverityBadge } from '../ui/SeverityBadge';
 import { UrgencyBadge } from '../ui/UrgencyBadge';
 import { CategoryBadge } from '../ui/CategoryBadge';
+import { useI18n } from '../../i18n/useI18n';
 
 interface ComplaintTableProps {
   complaints: Complaint[];
@@ -22,10 +23,11 @@ function formatDate(dateStr: string): string {
 
 export const ComplaintTable: React.FC<ComplaintTableProps> = ({ complaints, loading }) => {
   const navigate = useNavigate();
+  const { t } = useI18n();
 
   const columns: ColumnsType<Complaint> = [
     {
-      title: 'Summary',
+      title: t.complaints.colSummary,
       dataIndex: 'summary',
       key: 'summary',
       ellipsis: true,
@@ -36,14 +38,14 @@ export const ComplaintTable: React.FC<ComplaintTableProps> = ({ complaints, load
       ),
     },
     {
-      title: 'Category',
+      title: t.complaints.colCategory,
       dataIndex: 'category',
       key: 'category',
       width: 160,
       render: (cat: string) => <CategoryBadge category={cat} />,
     },
     {
-      title: 'Location',
+      title: t.complaints.colLocation,
       dataIndex: 'location',
       key: 'location',
       width: 110,
@@ -52,21 +54,21 @@ export const ComplaintTable: React.FC<ComplaintTableProps> = ({ complaints, load
       ),
     },
     {
-      title: 'Severity',
+      title: t.complaints.colSeverity,
       dataIndex: 'severity',
       key: 'severity',
       width: 110,
       render: (sev: Complaint['severity']) => <SeverityBadge severity={sev} />,
     },
     {
-      title: 'Urgency',
+      title: t.complaints.colUrgency,
       dataIndex: 'urgency',
       key: 'urgency',
       width: 110,
       render: (urg: Complaint['urgency']) => <UrgencyBadge urgency={urg} />,
     },
     {
-      title: 'Created',
+      title: t.complaints.colDate,
       dataIndex: 'created_at',
       key: 'created_at',
       width: 120,

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Mic, Square, AlertTriangle } from 'lucide-react';
+import { useI18n } from '../../i18n/useI18n';
 
 // Web Speech API type declarations
 interface SpeechRecognitionEvent extends Event {
@@ -54,13 +55,21 @@ function getSpeechRecognition(): (new () => SpeechRecognitionInstance) | null {
 }
 
 export const VoiceInput: React.FC<VoiceInputProps> = ({ onTranscript, disabled }) => {
+  const { currentMeta } = useI18n();
   const [state, setState] = useState<RecordingState>('idle');
-  const [language, setLanguage] = useState<VoiceLanguage>('en-IN');
+  const [language, setLanguage] = useState<VoiceLanguage>(() => (currentMeta.voiceCode as VoiceLanguage) || 'en-IN');
   const [interimText, setInterimText] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSupported] = useState(() => !!getSpeechRecognition());
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const finalTextRef = useRef('');
+
+  // Sync voice language when global language changes
+  useEffect(() => {
+    if (currentMeta.voiceCode) {
+      setLanguage(currentMeta.voiceCode as VoiceLanguage);
+    }
+  }, [currentMeta.voiceCode]);
 
   // Cleanup on unmount
   useEffect(() => {

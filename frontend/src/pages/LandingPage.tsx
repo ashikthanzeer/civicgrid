@@ -1,58 +1,49 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Mic, Cpu, BarChart3, CheckCircle2, MapPin, AlertTriangle, Zap, Trash2, Droplets } from 'lucide-react';
-
-const STEPS = [
-  {
-    icon: Mic,
-    label: 'Step 1',
-    title: 'Citizens speak freely',
-    description: 'Report issues in your own words — any language, any length. No forms, no jargon.',
-    color: 'var(--color-primary)',
-  },
-  {
-    icon: Cpu,
-    label: 'Step 2',
-    title: 'AI understands instantly',
-    description: 'CivicGrid structures each report into category, priority, location, and urgency.',
-    color: 'var(--color-accent)',
-  },
-  {
-    icon: BarChart3,
-    label: 'Step 3',
-    title: 'Teams see what matters',
-    description: 'Critical issues surface first. Patterns across wards reveal systemic problems.',
-    color: 'var(--color-success)',
-  },
-  {
-    icon: CheckCircle2,
-    label: 'Step 4',
-    title: 'Complaints get resolved',
-    description: 'Structured data routes to the right department. Citizens track progress in real time.',
-    color: 'var(--color-primary)',
-  },
-] as const;
-
-const EXAMPLE_COMPLAINT = {
-  raw: 'The streetlight near our house has been broken for two weeks and nobody has fixed it. It is very dark at night and feels unsafe for women walking home.',
-  result: {
-    category: 'Street Lighting',
-    subcategory: 'Non-functional streetlight',
-    severity: 'Medium',
-    urgency: 'Soon',
-    location: 'Unknown',
-    summary: 'Streetlight broken for two weeks, creating safety concern for pedestrians.',
-  },
-};
-
-const ISSUE_EXAMPLES = [
-  { icon: AlertTriangle, label: 'Potholes & Roads', color: '#e8a54b' },
-  { icon: Droplets, label: 'Water & Drainage', color: '#4a8fd4' },
-  { icon: Zap, label: 'Power Outages', color: '#f79009' },
-  { icon: Trash2, label: 'Waste & Sanitation', color: '#52b788' },
-];
+import { useI18n } from '../i18n/useI18n';
 
 const LandingPage: React.FC = () => {
+  const { t } = useI18n();
+
+  const steps = [
+    {
+      icon: Mic,
+      label: '01',
+      title: t.landing.step1Title,
+      description: t.landing.step1Desc,
+      color: 'var(--color-primary)',
+    },
+    {
+      icon: Cpu,
+      label: '02',
+      title: t.landing.step2Title,
+      description: t.landing.step2Desc,
+      color: 'var(--color-accent)',
+    },
+    {
+      icon: BarChart3,
+      label: '03',
+      title: t.landing.step3Title,
+      description: t.landing.step3Desc,
+      color: 'var(--color-success)',
+    },
+    {
+      icon: CheckCircle2,
+      label: '04',
+      title: t.landing.step4Title,
+      description: t.landing.step4Desc,
+      color: 'var(--color-primary)',
+    },
+  ] as const;
+
+  const issueExamples = [
+    { icon: AlertTriangle, label: t.landing.issuePotholes, color: '#e8a54b' },
+    { icon: Droplets, label: t.landing.issueWater, color: '#4a8fd4' },
+    { icon: Zap, label: t.landing.issuePower, color: '#f79009' },
+    { icon: Trash2, label: t.landing.issueSanitation, color: '#52b788' },
+  ];
+
   return (
     <div className="space-y-14 sm:space-y-20 lg:space-y-24 pb-12 sm:pb-16">
 
@@ -76,40 +67,40 @@ const LandingPage: React.FC = () => {
               style={{ backgroundColor: 'var(--color-primary)' }}
             />
           </span>
-          AI-powered civic intelligence
+          {t.landing.badge}
         </div>
 
         <h1
           className="font-display text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight"
           style={{ lineHeight: 1.12 }}
         >
-          Every complaint,{' '}
-          <span style={{ color: 'var(--color-primary)' }}>understood</span>.
+          {t.landing.heroTitle}{' '}
+          <span style={{ color: 'var(--color-primary)' }}>{t.landing.heroHighlight}</span>
         </h1>
 
         <p
           className="mx-auto mt-4 sm:mt-6 max-w-2xl text-base sm:text-lg lg:text-xl leading-relaxed"
           style={{ color: 'var(--color-muted)' }}
         >
-          CivicGrid turns unstructured citizen complaints into structured, prioritised, actionable civic intelligence — instantly.
+          {t.landing.heroSubtitle}
         </p>
 
         <div className="mt-8 sm:mt-10 flex flex-col items-stretch sm:items-center justify-center gap-3 sm:flex-row">
           <Link to="/submit" className="btn-primary w-full sm:w-auto">
-            Report an Issue
+            {t.landing.reportIssueCta}
             <ArrowRight className="h-4 w-4" aria-hidden />
           </Link>
           <Link
             to="/dashboard"
             className="btn-secondary w-full sm:w-auto"
           >
-            View Dashboard
+            {t.landing.viewDashboardCta}
           </Link>
         </div>
 
         {/* Issue type pills */}
         <div className="mt-12 flex flex-wrap justify-center gap-3">
-          {ISSUE_EXAMPLES.map(({ icon: Icon, label, color }) => (
+          {issueExamples.map(({ icon: Icon, label, color }) => (
             <div
               key={label}
               className="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium"
@@ -131,7 +122,7 @@ const LandingPage: React.FC = () => {
               color: 'var(--color-muted)',
             }}
           >
-            + more categories
+            + {t.common.all}
           </div>
         </div>
       </section>
@@ -140,10 +131,10 @@ const LandingPage: React.FC = () => {
       <section className="mx-auto max-w-4xl">
         <div className="mb-8 text-center">
           <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
-            See CivicGrid in action
+            {t.landing.liveDemoTitle}
           </h2>
           <p className="mt-2 text-sm" style={{ color: 'var(--color-muted)' }}>
-            A citizen complaint is instantly transformed into structured data.
+            {t.landing.liveDemoBadge}
           </p>
         </div>
 
@@ -161,11 +152,11 @@ const LandingPage: React.FC = () => {
                   color: 'var(--color-muted)',
                 }}
               >
-                Citizen report
+                {t.landing.rawComplaintLabel}
               </div>
             </div>
             <p className="text-base italic leading-relaxed" style={{ color: 'var(--color-text)' }}>
-              "{EXAMPLE_COMPLAINT.raw}"
+              "{t.landing.rawComplaintText}"
             </p>
           </div>
 
@@ -182,26 +173,42 @@ const LandingPage: React.FC = () => {
                   color: 'var(--color-primary)',
                 }}
               >
-                CivicGrid output
+                {t.landing.aiInterpreting}
               </div>
             </div>
             <dl className="space-y-3">
-              {Object.entries(EXAMPLE_COMPLAINT.result).map(([key, value]) => (
-                <div key={key} className="flex items-start justify-between gap-4">
-                  <dt
-                    className="w-24 shrink-0 text-xs font-semibold uppercase tracking-wide"
-                    style={{ color: 'var(--color-muted)', paddingTop: '2px' }}
-                  >
-                    {key.replace(/_/g, ' ')}
-                  </dt>
-                  <dd
-                    className="text-right text-sm font-medium"
-                    style={{ color: 'var(--color-text)' }}
-                  >
-                    {value}
-                  </dd>
-                </div>
-              ))}
+              <div className="flex items-start justify-between gap-4">
+                <dt className="w-28 shrink-0 text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-muted)', paddingTop: '2px' }}>
+                  {t.submit.assignedCategory}
+                </dt>
+                <dd className="text-right text-sm font-medium" style={{ color: 'var(--color-text)' }}>
+                  {t.landing.exampleCategory}
+                </dd>
+              </div>
+              <div className="flex items-start justify-between gap-4">
+                <dt className="w-28 shrink-0 text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-muted)', paddingTop: '2px' }}>
+                  {t.submit.assignedSeverity}
+                </dt>
+                <dd className="text-right text-sm font-medium" style={{ color: 'var(--color-text)' }}>
+                  {t.landing.exampleSeverity}
+                </dd>
+              </div>
+              <div className="flex items-start justify-between gap-4">
+                <dt className="w-28 shrink-0 text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-muted)', paddingTop: '2px' }}>
+                  {t.submit.assignedUrgency}
+                </dt>
+                <dd className="text-right text-sm font-medium" style={{ color: 'var(--color-text)' }}>
+                  {t.landing.exampleUrgency}
+                </dd>
+              </div>
+              <div className="flex items-start justify-between gap-4">
+                <dt className="w-28 shrink-0 text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-muted)', paddingTop: '2px' }}>
+                  {t.submit.extractedSummary}
+                </dt>
+                <dd className="text-right text-sm font-medium" style={{ color: 'var(--color-text)' }}>
+                  {t.landing.exampleSummary}
+                </dd>
+              </div>
             </dl>
           </div>
         </div>
@@ -211,15 +218,15 @@ const LandingPage: React.FC = () => {
       <section>
         <div className="mx-auto mb-12 max-w-xl text-center">
           <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
-            How CivicGrid works
+            {t.landing.howItWorksTitle}
           </h2>
           <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--color-muted)' }}>
-            Four steps from report to resolution.
+            {t.landing.howItWorksSubtitle}
           </p>
         </div>
 
         <ol className="relative grid gap-px sm:grid-cols-2 lg:grid-cols-4">
-          {STEPS.map((step, index) => {
+          {steps.map((step, index) => {
             const Icon = step.icon;
             return (
               <li
@@ -245,7 +252,7 @@ const LandingPage: React.FC = () => {
                 <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--color-muted)' }}>
                   {step.description}
                 </p>
-                {index < STEPS.length - 1 && (
+                {index < steps.length - 1 && (
                   <div
                     className="absolute -right-px top-1/2 hidden h-px w-px lg:block"
                     style={{ color: 'var(--color-border)' }}
@@ -272,13 +279,13 @@ const LandingPage: React.FC = () => {
           <MapPin className="h-6 w-6" style={{ color: 'var(--color-primary-fg)' }} aria-hidden />
         </div>
         <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl" style={{ color: 'var(--color-text)' }}>
-          See something that needs fixing?
+          {t.landing.commonIssuesTitle}
         </h2>
         <p className="mx-auto mt-3 max-w-lg text-sm leading-relaxed" style={{ color: 'var(--color-muted)' }}>
-          Describe it in plain language. CivicGrid handles the rest — classification, routing, and tracking — so the right team can act.
+          {t.landing.commonIssuesSubtitle}
         </p>
         <Link to="/submit" className="btn-primary mt-8 inline-flex">
-          Report an Issue
+          {t.landing.reportIssueCta}
           <ArrowRight className="h-4 w-4" aria-hidden />
         </Link>
       </section>

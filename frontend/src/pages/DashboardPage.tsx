@@ -9,6 +9,7 @@ import { LoadingSkeleton } from '../components/ui/LoadingSkeleton';
 import type { ComplaintFilters } from '../types/filters';
 import type { Complaint } from '../types/complaint';
 import { RefreshCw } from 'lucide-react';
+import { useI18n } from '../i18n/useI18n';
 
 function applyFilters(complaints: Complaint[], f: ComplaintFilters): Complaint[] {
   return complaints.filter((c) => {
@@ -25,6 +26,7 @@ function applyFilters(complaints: Complaint[], f: ComplaintFilters): Complaint[]
 const DashboardPage: React.FC = () => {
   const { data, isLoading, isError, refetch } = useComplaints();
   const [filters, setFilters] = useState<ComplaintFilters>({});
+  const { t } = useI18n();
 
   const allComplaints = data?.complaints ?? [];
   const filtered = applyFilters(allComplaints, filters);
@@ -33,7 +35,7 @@ const DashboardPage: React.FC = () => {
   ).length;
 
   if (isError) {
-    return <ErrorState message="We couldn't load the dashboard." onRetry={() => refetch()} />;
+    return <ErrorState message={t.common.error} onRetry={() => refetch()} />;
   }
 
   return (
@@ -43,14 +45,14 @@ const DashboardPage: React.FC = () => {
         style={{ borderColor: 'var(--color-border)' }}
       >
         <div>
-          <h1 className="font-display text-3xl font-bold tracking-tight">Dashboard</h1>
+          <h1 className="font-display text-3xl font-bold tracking-tight">{t.dashboard.pageTitle}</h1>
           <p className="mt-2 text-sm" style={{ color: 'var(--color-muted)' }}>
-            Overview of civic reports across all sectors.
+            {t.dashboard.pageSubtitle}
           </p>
         </div>
         <button type="button" onClick={() => refetch()} className="btn-secondary" aria-label="Refresh dashboard">
           <RefreshCw className="h-4 w-4" />
-          Refresh
+          {t.common.retry}
         </button>
       </div>
 
