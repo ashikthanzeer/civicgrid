@@ -39,7 +39,15 @@ function PlacesSearchInput({
 
   useEffect(() => {
     if (placesLib && !serviceRef.current) {
-      serviceRef.current = new placesLib.AutocompleteService();
+      try {
+        if ('AutocompleteSuggestion' in (placesLib as object)) {
+          serviceRef.current = new (placesLib as any).AutocompleteSuggestion();
+        } else {
+          serviceRef.current = new placesLib.AutocompleteService();
+        }
+      } catch {
+        serviceRef.current = new placesLib.AutocompleteService();
+      }
     }
   }, [placesLib]);
 

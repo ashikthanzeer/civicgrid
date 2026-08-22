@@ -141,12 +141,6 @@ def get_stats() -> StatsResponse:
     return StatsResponse(**db.get_stats())
 
 
-@app.get(
-    "/api/complaints",
-    response_model=ListComplaintsResponse,
-    summary="List complaints with filters",
-    tags=["complaints"],
-)
 def _clean_complaint(row: dict) -> ComplaintOut:
     """Strip None values for non-optional fields so Pydantic defaults apply cleanly."""
     cleaned = {k: v for k, v in row.items() if v is not None}
@@ -160,14 +154,14 @@ def _clean_complaint(row: dict) -> ComplaintOut:
     tags=["complaints"],
 )
 def list_complaints(
-    status: Annotated[list[str] | None, Query(description="Filter by status")] = None,
-    category: Annotated[list[str] | None, Query(description="Filter by category")] = None,
-    severity: Annotated[list[str] | None, Query(description="Filter by severity")] = None,
-    location: Annotated[list[str] | None, Query(description="Filter by location")] = None,
-    search: Annotated[str | None, Query(description="Full-text search")] = None,
-    sort: Annotated[str, Query(description="newest|oldest|highest_severity|highest_urgency")] = "newest",
-    skip: Annotated[int, Query(ge=0)] = 0,
-    limit: Annotated[int, Query(ge=1, le=500)] = 100,
+    status: Annotated[list[str] | None, Query(default=None, description="Filter by status")] = None,
+    category: Annotated[list[str] | None, Query(default=None, description="Filter by category")] = None,
+    severity: Annotated[list[str] | None, Query(default=None, description="Filter by severity")] = None,
+    location: Annotated[list[str] | None, Query(default=None, description="Filter by location")] = None,
+    search: Annotated[str | None, Query(default=None, description="Full-text search")] = None,
+    sort: Annotated[str, Query(default="newest", description="newest|oldest|highest_severity|highest_urgency")] = "newest",
+    skip: Annotated[int, Query(default=0, ge=0)] = 0,
+    limit: Annotated[int, Query(default=100, ge=1, le=500)] = 100,
 ) -> ListComplaintsResponse:
     rows, total = db.list_complaints(
         status=status,
