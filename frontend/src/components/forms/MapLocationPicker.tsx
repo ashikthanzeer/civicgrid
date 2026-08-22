@@ -1,6 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
-  APIProvider,
   Map,
   AdvancedMarker,
   useMap,
@@ -23,61 +22,120 @@ interface MapLocationPickerProps {
   disabled?: boolean;
 }
 
-/** Places Autocomplete search input */
-function PlacesAutocomplete({
-  onPlaceSelect,
+/** Places search input using programmatic AutocompleteService (no legacy Autocomplete deprecation warning) */
+function PlacesSearchInput({
+  onSelectAddress,
   disabled,
 }: {
-  onPlaceSelect: (place: google.maps.places.PlaceResult) => void;
+  onSelectAddress: (address: string, lat: number, lng: number) => void;
   disabled?: boolean;
 }) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const places = useMapsLibrary('places');
-  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+  const [query, setQuery] = useState('');
+  const [predictions, setPredictions] = useState<google.maps.places.AutocompletePrediction[]>([]);
+  const [isOpen, setIsOpen] = useState(false);
+  const placesLib = useMapsLibrary('places');
+  const serviceRef = useRef<google.maps.places.AutocompleteService | null>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!places || !inputRef.current) return;
+    if (placesLib && !serviceRef.current) {
+      serviceRef.current = new placesLib.AutocompleteService();
+    }
+  }, [placesLib]);
 
-    const autocomplete = new places.Autocomplete(inputRef.current, {
-      componentRestrictions: { country: 'in' },
-      fields: ['formatted_address', 'geometry', 'name'],
-      types: ['geocode', 'establishment'],
-    });
-
-    autocomplete.addListener('place_changed', () => {
-      const place = autocomplete.getPlace();
-      if (place.geometry) {
-        onPlaceSelect(place);
-      }
-    });
-
-    autocompleteRef.current = autocomplete;
-
-    return () => {
-      if (autocompleteRef.current) {
-        google.maps.event.clearInstanceListeners(autocompleteRef.current);
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
       }
     };
-  }, [places, onPlaceSelect]);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setQuery(val);
+    if (!val.trim() || !serviceRef.current) {
+      setPredictions([]);
+      setIsOpen(false);
+      return;
+    }
+
+    serviceRef.current.getPlacePredictions(
+      { input: val, componentRestrictions: { country: 'in' } },
+      (results, status) => {
+        if (status === google.maps.places.PlacesServiceStatus.OK && results) {
+          setPredictions(results);
+          setIsOpen(true);
+        } else {
+          setPredictions([]);
+          setIsOpen(false);
+        }
+      },
+    );
+  };
+
+  const handleSelect = (prediction: google.maps.places.AutocompletePrediction) => {
+    const geocoder = new google.maps.Geocoder();
+    geocoder.geocode({ placeId: prediction.place_id }, (results, status) => {
+      if (status === 'OK' && results?.[0]?.geometry?.location) {
+        const loc = results[0].geometry.location;
+        const address = results[0].formatted_address || prediction.description;
+        setQuery(address);
+        setIsOpen(false);
+        onSelectAddress(address, loc.lat(), loc.lng());
+      }
+    });
+  };
 
   return (
-    <div className="relative">
-      <Search
-        className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4"
-        style={{ color: 'var(--color-muted)' }}
-      />
-      <input
-        ref={inputRef}
-        type="text"
-        placeholder="Search for a place in India..."
-        disabled={disabled}
-        className="w-full rounded-lg border py-2.5 pl-10 pr-3 text-sm transition-colors focus:outline-none"
-        style={{
-          borderColor: 'var(--color-border)',
-          backgroundColor: 'var(--color-surface)',
-          color: 'var(--color-text)',
-        }}
-      />
+    <div ref={wrapperRef} className="relative flex-1">
+      <div className="relative">
+        <Search
+          className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4"
+          style={{ color: 'var(--color-muted)' }}
+        />
+        <input
+          type="text"
+          value={query}
+          onChange={handleInputChange}
+          onFocus={() => {
+            if (predictions.length > 0) setIsOpen(true);
+          }}
+          placeholder="Search for a place in India..."
+          disabled={disabled}
+          className="w-full rounded-lg border py-2.5 pl-10 pr-3 text-sm transition-colors focus:outline-none"
+          style={{
+            borderColor: 'var(--color-border)',
+            backgroundColor: 'var(--color-surface)',
+            color: 'var(--color-text)',
+          }}
+        />
+      </div>
+
+      {isOpen && predictions.length > 0 && (
+        <ul
+          className="absolute z-50 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border shadow-lg"
+          style={{
+            backgroundColor: 'var(--color-surface)',
+            borderColor: 'var(--color-border)',
+          }}
+        >
+          {predictions.map((p) => (
+            <li
+              key={p.place_id}
+              onClick={() => handleSelect(p)}
+              className="flex items-center gap-2.5 px-3.5 py-2.5 text-xs transition-colors hover:bg-black/5 dark:hover:bg-white/10 cursor-pointer"
+              style={{ color: 'var(--color-text)' }}
+            >
+              <MapPin className="h-3.5 w-3.5 shrink-0" style={{ color: 'var(--color-primary)' }} />
+              <span>{p.description}</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
@@ -98,7 +156,6 @@ function MapClickHandler({
       const lat = e.latLng.lat();
       const lng = e.latLng.lng();
 
-      // Reverse geocode
       try {
         const geocoder = new google.maps.Geocoder();
         const response = await geocoder.geocode({ location: { lat, lng } });
@@ -146,12 +203,8 @@ export const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
     [onChange],
   );
 
-  const handlePlaceSelect = useCallback(
-    (place: google.maps.places.PlaceResult) => {
-      if (!place.geometry?.location) return;
-      const lat = place.geometry.location.lat();
-      const lng = place.geometry.location.lng();
-      const address = place.formatted_address || place.name || '';
+  const handleSelectAddress = useCallback(
+    (address: string, lat: number, lng: number) => {
       setMarkerPos({ lat, lng });
       setCenterTarget({ lat, lng });
       onChange(address, lat, lng);
@@ -209,83 +262,79 @@ export const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
 
   return (
     <div className="space-y-3">
-      <APIProvider apiKey={MAPS_API_KEY} libraries={['places']}>
-        {/* Search + GPS button */}
-        <div className="flex gap-2">
-          <div className="flex-1">
-            <PlacesAutocomplete onPlaceSelect={handlePlaceSelect} disabled={disabled} />
-          </div>
-          <button
-            type="button"
-            onClick={handleGeolocate}
-            disabled={disabled || geoLoading}
-            title="Use current location"
-            aria-label="Use current location"
-            className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50"
-            style={{
-              borderColor: 'var(--color-border)',
-              color: 'var(--color-muted)',
-              backgroundColor: 'var(--color-surface)',
-            }}
-          >
-            {geoLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Navigation className="h-4 w-4" />
-            )}
-            <span className="hidden sm:inline">My Location</span>
-          </button>
-        </div>
+      {/* Search + GPS button */}
+      <div className="flex gap-2">
+        <PlacesSearchInput onSelectAddress={handleSelectAddress} disabled={disabled} />
+        <button
+          type="button"
+          onClick={handleGeolocate}
+          disabled={disabled || geoLoading}
+          title="Use current location"
+          aria-label="Use current location"
+          className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50"
+          style={{
+            borderColor: 'var(--color-border)',
+            color: 'var(--color-muted)',
+            backgroundColor: 'var(--color-surface)',
+          }}
+        >
+          {geoLoading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Navigation className="h-4 w-4" />
+          )}
+          <span className="hidden sm:inline">My Location</span>
+        </button>
+      </div>
 
-        {/* Map */}
-        <div className="overflow-hidden rounded-lg" style={{ border: '1px solid var(--color-border)' }}>
-          <Map
-            defaultCenter={INDIA_CENTER}
-            defaultZoom={5}
-            mapId="civicgrid-location-picker"
-            gestureHandling="greedy"
-            disableDefaultUI
-            zoomControl
-            style={{ width: '100%', height: 260 }}
-          >
-            {markerPos && (
-              <AdvancedMarker position={markerPos}>
+      {/* Map */}
+      <div className="overflow-hidden rounded-lg" style={{ border: '1px solid var(--color-border)' }}>
+        <Map
+          defaultCenter={INDIA_CENTER}
+          defaultZoom={5}
+          mapId="civicgrid-location-picker"
+          gestureHandling="greedy"
+          disableDefaultUI
+          zoomControl
+          style={{ width: '100%', height: 260 }}
+        >
+          {markerPos && (
+            <AdvancedMarker position={markerPos}>
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                }}
+              >
                 <div
                   style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
+                    width: 28,
+                    height: 28,
+                    borderRadius: '50% 50% 50% 0',
+                    transform: 'rotate(-45deg)',
+                    backgroundColor: 'var(--color-primary, #6366f1)',
+                    border: '2px solid white',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
                   }}
-                >
-                  <div
-                    style={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: '50% 50% 50% 0',
-                      transform: 'rotate(-45deg)',
-                      backgroundColor: 'var(--color-primary, #6366f1)',
-                      border: '2px solid white',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-                    }}
-                  />
-                  <div
-                    style={{
-                      width: 6,
-                      height: 6,
-                      borderRadius: '50%',
-                      backgroundColor: 'rgba(0,0,0,0.15)',
-                      marginTop: 2,
-                    }}
-                  />
-                </div>
-              </AdvancedMarker>
-            )}
+                />
+                <div
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: '50%',
+                    backgroundColor: 'rgba(0,0,0,0.15)',
+                    marginTop: 2,
+                  }}
+                />
+              </div>
+            </AdvancedMarker>
+          )}
 
-            <MapClickHandler onLocationSelect={handleLocationSelect} />
-            <CenterMap position={centerTarget} />
-          </Map>
-        </div>
-      </APIProvider>
+          <MapClickHandler onLocationSelect={handleLocationSelect} />
+          <CenterMap position={centerTarget} />
+        </Map>
+      </div>
 
       {/* Selected location display */}
       {value && (

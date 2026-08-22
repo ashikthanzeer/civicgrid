@@ -29,6 +29,8 @@ export const NavDrawer: React.FC<NavDrawerProps> = ({ isOpen, onClose }) => {
     };
   }, [isOpen, onClose]);
 
+  if (!isOpen) return null;
+
   return (
     <div
       className="fixed inset-0 z-50 transition-all duration-300"

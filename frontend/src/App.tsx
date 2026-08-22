@@ -83,11 +83,17 @@ function AppContent() {
   );
 }
 
+import { APIProvider } from '@vis.gl/react-google-maps';
+
+const MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
+
 function App() {
   return (
     <ThemeProvider>
       <I18nProvider>
-        <AppContent />
+        <APIProvider apiKey={MAPS_API_KEY} libraries={['places']}>
+          <AppContent />
+        </APIProvider>
       </I18nProvider>
     </ThemeProvider>
   );

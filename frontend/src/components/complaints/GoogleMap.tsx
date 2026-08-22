@@ -1,6 +1,5 @@
 import React, { useMemo, useCallback, useState } from 'react';
 import {
-  APIProvider,
   Map,
   AdvancedMarker,
   InfoWindow,
@@ -159,38 +158,36 @@ export const GoogleMapView: React.FC<GoogleMapProps> = ({
   }
 
   const mapContent = (
-    <APIProvider apiKey={MAPS_API_KEY}>
-      <Map
-        defaultCenter={INDIA_CENTER}
-        defaultZoom={INDIA_ZOOM}
-        mapId="civicgrid-map"
-        gestureHandling="greedy"
-        disableDefaultUI={false}
-        style={{ width: '100%', height: '100%' }}
-      >
-        {geoComplaints.map((c) => (
-          <AdvancedMarker
-            key={c.id}
-            position={{ lat: c.latitude!, lng: c.longitude! }}
-            onClick={() => handleMarkerClick(c.id)}
-          >
-            <SeverityDot severity={c.severity} />
-          </AdvancedMarker>
-        ))}
+    <Map
+      defaultCenter={INDIA_CENTER}
+      defaultZoom={INDIA_ZOOM}
+      mapId="civicgrid-map"
+      gestureHandling="greedy"
+      disableDefaultUI={false}
+      style={{ width: '100%', height: '100%' }}
+    >
+      {geoComplaints.map((c) => (
+        <AdvancedMarker
+          key={c.id}
+          position={{ lat: c.latitude!, lng: c.longitude! }}
+          onClick={() => handleMarkerClick(c.id)}
+        >
+          <SeverityDot severity={c.severity} />
+        </AdvancedMarker>
+      ))}
 
-        {selectedComplaint && selectedComplaint.latitude != null && selectedComplaint.longitude != null && (
-          <InfoWindow
-            position={{ lat: selectedComplaint.latitude, lng: selectedComplaint.longitude }}
-            onCloseClick={() => setSelectedId(null)}
-            pixelOffset={[0, -20]}
-          >
-            <ComplaintInfo complaint={selectedComplaint} />
-          </InfoWindow>
-        )}
+      {selectedComplaint && selectedComplaint.latitude != null && selectedComplaint.longitude != null && (
+        <InfoWindow
+          position={{ lat: selectedComplaint.latitude, lng: selectedComplaint.longitude }}
+          onCloseClick={() => setSelectedId(null)}
+          pixelOffset={[0, -20]}
+        >
+          <ComplaintInfo complaint={selectedComplaint} />
+        </InfoWindow>
+      )}
 
-        <FitBounds positions={positions} />
-      </Map>
-    </APIProvider>
+      <FitBounds positions={positions} />
+    </Map>
   );
 
   if (fullScreen) {
