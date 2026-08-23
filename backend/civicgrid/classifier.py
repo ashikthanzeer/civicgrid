@@ -130,7 +130,7 @@ class GeminiClassifier:
         from .gemini import classify_complaint
         try:
             return classify_complaint(text, image_b64)
-        except GeminiExtractionError as exc:
+        except Exception as exc:
             logger.warning("Gemini extraction failed (%s). Falling back to rule-based classification.", exc)
             return self._fallback.classify(text, image_b64)
 

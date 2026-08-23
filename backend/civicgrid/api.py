@@ -58,12 +58,19 @@ app.add_middleware(
 )
 
 
-@app.middleware("http")
-async def ensure_cors_headers(request, call_next):
-    """Ensure CORS headers are always present even on 5xx error responses."""
+@app.options("/{full_path:path}", include_in_schema=False)
+async def options_preflight_handler(full_path: str):  # noqa: ARG001
+    """Global OPTIONS preflight handler to prevent 405 CORS issues."""
+    return {}
+
+
+from fastapi.responses import JSONResponse
+from fastapi.requests import Request
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
+def _add_cors_headers(request: Request, response: JSONResponse) -> JSONResponse:
     origin = request.headers.get("origin")
-    response = await call_next(request)
-    if origin and "access-control-allow-origin" not in response.headers:
+    if origin:
         response.headers["access-control-allow-origin"] = origin
         response.headers["access-control-allow-credentials"] = "true"
         response.headers["access-control-allow-methods"] = "*"
@@ -71,10 +78,23 @@ async def ensure_cors_headers(request, call_next):
     return response
 
 
-@app.options("/{full_path:path}", include_in_schema=False)
-async def options_preflight_handler(full_path: str):  # noqa: ARG001
-    """Global OPTIONS preflight handler to prevent 405 CORS issues."""
-    return {}
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error("Unhandled exception: %s", exc, exc_info=True)
+    response = JSONResponse(
+        status_code=500,
+        content={"detail": "An unexpected server error occurred. Please try again later."},
+    )
+    return _add_cors_headers(request, response)
+
+
+@app.exception_handler(StarletteHTTPException)
+async def custom_http_exception_handler(request: Request, exc: StarletteHTTPException):
+    response = JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+    )
+    return _add_cors_headers(request, response)
 
 
 
