@@ -434,12 +434,9 @@ export const ComplaintDetails: React.FC<ComplaintDetailsProps> = ({ complaint: i
 
               {complaint.summary && (
                 <div className="border-t pt-4" style={{ borderColor: 'var(--color-border)' }}>
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-muted)' }}>
-                      {t.submit.extractedSummary}
-                    </p>
-                    <TTSButton text={complaint.summary} sourceLanguage="English" showSubtitle={false} />
-                  </div>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-muted)' }}>
+                    {t.submit.extractedSummary}
+                  </p>
                   <p className="text-sm leading-relaxed" style={{ color: 'var(--color-text)' }}>{complaint.summary}</p>
                 </div>
               )}
