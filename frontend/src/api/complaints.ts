@@ -72,25 +72,30 @@ export interface TranslateResponse {
 export const translateComplaintText = async (
   text: string,
   targetLanguage: string,
+  sourceLanguage?: string,
 ): Promise<{ translatedText: string; detectedLanguage?: string }> => {
   if (!text || text.trim() === '') {
     return { translatedText: '' };
   }
   if (isMockMode) {
-    return { translatedText: text, detectedLanguage: 'English' };
+    return { translatedText: text, detectedLanguage: sourceLanguage || 'English' };
   }
   try {
     const res = await apiClient<TranslateResponse>('/api/translate', {
       method: 'POST',
-      body: JSON.stringify({ text, target_language: targetLanguage }),
+      body: JSON.stringify({
+        text,
+        target_language: targetLanguage,
+        source_language: sourceLanguage,
+      }),
     });
     return {
       translatedText: res.translated_text || text,
-      detectedLanguage: res.detected_language,
+      detectedLanguage: res.detected_language || sourceLanguage,
     };
   } catch (err) {
     console.warn('Translation API failed, using original text:', err);
-    return { translatedText: text };
+    return { translatedText: text, detectedLanguage: sourceLanguage };
   }
 };
 

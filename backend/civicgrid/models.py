@@ -42,6 +42,7 @@ class ComplaintOut(BaseModel):
     duplicate_of_id: str | None = None
     citizen_reports_count: int = 1
     additional_updates: str = "[]"
+    detected_language: str = "English"
 
 
 class SubmitComplaintResponse(BaseModel):
@@ -88,6 +89,7 @@ class ChangePasswordOut(BaseModel):
 class TranslateTextIn(BaseModel):
     text: str = Field(min_length=1, max_length=3000, description="Source text to translate")
     target_language: str = Field(min_length=2, max_length=20, description="Target language code (e.g., hi, ml, ta, te, kn, bn, mr, en)")
+    source_language: str | None = Field(default=None, description="Optional stored source language of the complaint")
 
 
 class TranslateTextOut(BaseModel):

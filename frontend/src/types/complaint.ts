@@ -39,4 +39,5 @@ export interface Complaint {
   duplicate_of_id?: string | null;
   citizen_reports_count?: number;
   additional_updates?: string | Array<{ text: string; created_at: string; image_url?: string }>;
+  detected_language?: string;
 }

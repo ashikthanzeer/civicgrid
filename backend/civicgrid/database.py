@@ -38,7 +38,8 @@ CREATE TABLE IF NOT EXISTS complaints (
     is_duplicate      INTEGER DEFAULT 0,
     duplicate_of_id   TEXT,
     citizen_reports_count INTEGER DEFAULT 1,
-    additional_updates TEXT DEFAULT '[]'
+    additional_updates TEXT DEFAULT '[]',
+    detected_language TEXT DEFAULT 'English'
 );
 CREATE INDEX IF NOT EXISTS idx_complaints_status   ON complaints(status);
 CREATE INDEX IF NOT EXISTS idx_complaints_category ON complaints(category);
@@ -132,6 +133,7 @@ def init_db() -> None:
                     cur.execute("ALTER TABLE complaints ADD COLUMN IF NOT EXISTS duplicate_of_id TEXT;")
                     cur.execute("ALTER TABLE complaints ADD COLUMN IF NOT EXISTS citizen_reports_count INTEGER DEFAULT 1;")
                     cur.execute("ALTER TABLE complaints ADD COLUMN IF NOT EXISTS additional_updates TEXT DEFAULT '[]';")
+                    cur.execute("ALTER TABLE complaints ADD COLUMN IF NOT EXISTS detected_language TEXT DEFAULT 'English';")
                     _seed_officer(cur, is_pg=True)
                 conn.commit()
         else:
@@ -139,7 +141,7 @@ def init_db() -> None:
             try:
                 conn.executescript(_CREATE_TABLE_SQL)
                 # Migration for existing SQLite DBs
-                for col in ["latitude REAL", "longitude REAL", "image_url TEXT", "image_analysis TEXT", "is_duplicate INTEGER DEFAULT 0", "duplicate_of_id TEXT", "citizen_reports_count INTEGER DEFAULT 1", "additional_updates TEXT DEFAULT '[]'"]:
+                for col in ["latitude REAL", "longitude REAL", "image_url TEXT", "image_analysis TEXT", "is_duplicate INTEGER DEFAULT 0", "duplicate_of_id TEXT", "citizen_reports_count INTEGER DEFAULT 1", "additional_updates TEXT DEFAULT '[]'", "detected_language TEXT DEFAULT 'English'"]:
                     try:
                         conn.execute(f"ALTER TABLE complaints ADD COLUMN {col}")
                     except sqlite3.OperationalError:
@@ -184,6 +186,7 @@ def insert_complaint(
     image_analysis: str | None = None,
     is_duplicate: bool = False,
     duplicate_of_id: str | None = None,
+    detected_language: str = "English",
 ) -> dict[str, Any]:
     """Insert a new complaint and return the full record."""
     now = datetime.now(timezone.utc).isoformat()
@@ -198,8 +201,8 @@ def insert_complaint(
                         INSERT INTO complaints
                           (id, raw_text, category, subcategory, severity, urgency,
                            location, affected_facility, summary, status, created_at, updated_at,
-                           latitude, longitude, image_url, image_analysis, is_duplicate, duplicate_of_id)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                           latitude, longitude, image_url, image_analysis, is_duplicate, duplicate_of_id, detected_language)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         RETURNING *
                         """,
                         (
@@ -221,6 +224,7 @@ def insert_complaint(
                             image_analysis,
                             is_dup_int,
                             duplicate_of_id,
+                            detected_language,
                         ),
                     )
                     row = cur.fetchone()
@@ -235,8 +239,8 @@ def insert_complaint(
                     INSERT INTO complaints
                       (id, raw_text, category, subcategory, severity, urgency,
                        location, affected_facility, summary, status, created_at, updated_at,
-                       latitude, longitude, image_url, image_analysis, is_duplicate, duplicate_of_id)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                       latitude, longitude, image_url, image_analysis, is_duplicate, duplicate_of_id, detected_language)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         complaint_id,
@@ -257,6 +261,7 @@ def insert_complaint(
                         image_analysis,
                         is_dup_int,
                         duplicate_of_id,
+                        detected_language,
                     ),
                 )
                 conn.commit()

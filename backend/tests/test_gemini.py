@@ -38,7 +38,16 @@ def test_schema_has_required_fields():
         "is_spam",
         "is_duplicate",
         "duplicate_of_id",
+        "detected_language",
     } == set(CivicComplaint.model_fields)
+
+
+def test_translate_text_fast_path_same_language():
+    from civicgrid.gemini import translate_text
+    result = translate_text("പഞ്ചായത്ത് റോഡിൽ വലിയ കുഴിയുണ്ട്", "ml", source_lang="Malayalam")
+    assert result["translated_text"] == "പഞ്ചായത്ത് റോഡിൽ വലിയ കുഴിയുണ്ട്"
+    assert result["target_language"] == "ml"
+
 
 
 def test_schema_accepts_valid_values():

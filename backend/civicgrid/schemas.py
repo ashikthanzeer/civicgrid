@@ -46,3 +46,4 @@ class CivicComplaint(BaseModel):
     is_spam: bool = False
     is_duplicate: bool = False
     duplicate_of_id: str | None = None
+    detected_language: str = "English"

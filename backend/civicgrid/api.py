@@ -169,6 +169,7 @@ def submit_complaint(req: SubmitComplaintIn) -> SubmitComplaintResponse:
         image_analysis=classification.image_analysis,
         is_duplicate=False,
         duplicate_of_id=None,
+        detected_language=getattr(classification, "detected_language", "English"),
     )
     return SubmitComplaintResponse(success=True, complaint=_clean_complaint(row))
 
@@ -351,9 +352,9 @@ def change_password(req: ChangePasswordIn) -> ChangePasswordOut:
     tags=["translation"],
 )
 def translate_text_endpoint(req: TranslateTextIn) -> TranslateTextOut:
-    """Auto-detect language and translate civic complaint text or summary to target language."""
+    """Translate civic complaint text or summary to target language using stored source language or auto-detection."""
     from .gemini import translate_text
-    result = translate_text(req.text, req.target_language)
+    result = translate_text(req.text, req.target_language, req.source_language)
     return TranslateTextOut(
         original_text=req.text,
         translated_text=result["translated_text"],

@@ -30,6 +30,8 @@ and Soon urgency. A fallen live electrical wire near a school can be Critical
 severity and Emergency urgency.
 
 If a photo is provided with the complaint, analyze the visual evidence in the image and summarize what civic issue is visually confirmed in 1 concise sentence for `image_analysis`. If no photo is provided, set `image_analysis` to "No photo provided".
+
+Identify the primary language in which the citizen complaint was written (e.g., "Malayalam", "Hindi", "English", "Tamil", "Telugu", "Kannada", "Bengali", "Marathi") and set `detected_language` to that language name.
 """
 
 

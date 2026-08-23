@@ -8,13 +8,35 @@ import type { SupportedLanguage } from '../../i18n/types';
 
 interface TTSButtonProps {
   text: string;
+  sourceLanguage?: string;
   label?: string;
   className?: string;
   showSubtitle?: boolean;
 }
 
+const LANG_NAME_TO_CODE: Record<string, SupportedLanguage> = {
+  english: 'en',
+  en: 'en',
+  hindi: 'hi',
+  hi: 'hi',
+  malayalam: 'ml',
+  ml: 'ml',
+  tamil: 'ta',
+  ta: 'ta',
+  telugu: 'te',
+  te: 'te',
+  kannada: 'kn',
+  kn: 'kn',
+  bengali: 'bn',
+  bangla: 'bn',
+  bn: 'bn',
+  marathi: 'mr',
+  mr: 'mr',
+};
+
 export const TTSButton: React.FC<TTSButtonProps> = ({
   text,
+  sourceLanguage,
   label,
   className = '',
   showSubtitle = true,
@@ -25,7 +47,7 @@ export const TTSButton: React.FC<TTSButtonProps> = ({
   const [isTranslating, setIsTranslating] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [translatedText, setTranslatedText] = useState<string | null>(null);
-  const [detectedLang, setDetectedLang] = useState<string | null>(null);
+  const [detectedLang, setDetectedLang] = useState<string | null>(sourceLanguage || null);
 
   const translationCache = useRef<Record<string, { text: string; detected?: string }>>({});
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -71,6 +93,24 @@ export const TTSButton: React.FC<TTSButtonProps> = ({
 
       if (!text || text.trim() === '') return;
 
+      const sourceCode = sourceLanguage
+        ? LANG_NAME_TO_CODE[sourceLanguage.trim().toLowerCase()]
+        : undefined;
+
+      // 1. FAST PATH: If target matches stored source language, skip translation entirely (0ms latency)
+      if (sourceCode && sourceCode === targetLang) {
+        setTranslatedText(text);
+        setDetectedLang(sourceLanguage || 'English');
+        const success = speakText(
+          text,
+          targetLang,
+          () => setIsPlaying(false),
+          () => setIsPlaying(false),
+        );
+        if (success) setIsPlaying(true);
+        return;
+      }
+
       const cacheKey = `${targetLang}_${text}`;
       let textToSpeak = text;
 
@@ -82,16 +122,14 @@ export const TTSButton: React.FC<TTSButtonProps> = ({
       } else {
         setIsTranslating(true);
         try {
-          const res = await translateComplaintText(text, targetLang);
+          const res = await translateComplaintText(text, targetLang, sourceLanguage);
           textToSpeak = res.translatedText || text;
           translationCache.current[cacheKey] = {
             text: textToSpeak,
-            detected: res.detectedLanguage,
+            detected: res.detectedLanguage || sourceLanguage,
           };
           setTranslatedText(textToSpeak);
-          if (res.detectedLanguage) {
-            setDetectedLang(res.detectedLanguage);
-          }
+          setDetectedLang(res.detectedLanguage || sourceLanguage || null);
         } catch {
           textToSpeak = text;
           setTranslatedText(text);
@@ -111,7 +149,7 @@ export const TTSButton: React.FC<TTSButtonProps> = ({
         setIsPlaying(true);
       }
     },
-    [isPlaying, text],
+    [isPlaying, text, sourceLanguage],
   );
 
   const handleLanguageSelect = (langCode: SupportedLanguage) => {

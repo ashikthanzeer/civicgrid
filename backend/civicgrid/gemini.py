@@ -181,32 +181,63 @@ LANGUAGE_NAMES: dict[str, str] = {
 }
 
 
-import json
+LANGUAGE_CODES_BY_NAME: dict[str, str] = {
+    "english": "en",
+    "en": "en",
+    "hindi": "hi",
+    "hi": "hi",
+    "malayalam": "ml",
+    "ml": "ml",
+    "tamil": "ta",
+    "ta": "ta",
+    "telugu": "te",
+    "te": "te",
+    "kannada": "kn",
+    "kn": "kn",
+    "bengali": "bn",
+    "bangla": "bn",
+    "bn": "bn",
+    "marathi": "mr",
+    "mr": "mr",
+}
 
 
-def translate_text(text: str, target_lang: str) -> dict[str, str]:
-    """Auto-detect source language and translate civic complaint text into target language using Gemini."""
+def translate_text(text: str, target_lang: str, source_lang: str | None = None) -> dict[str, str]:
+    """Translate civic complaint text into target language using stored source language or auto-detection."""
     cleaned_text = _validate_input(text)
-    lang_code = target_lang.lower().split("-")[0]
-    lang_name = LANGUAGE_NAMES.get(lang_code, target_lang)
+    target_code = target_lang.lower().split("-")[0]
+    target_name = LANGUAGE_NAMES.get(target_code, target_lang)
+
+    source_code = None
+    if source_lang:
+        source_clean = source_lang.strip().lower()
+        source_code = LANGUAGE_CODES_BY_NAME.get(source_clean, source_clean.split("-")[0])
+
+    # 1. High Performance Fast Path: If source and target languages match, return immediately (0ms latency, zero API calls)
+    if source_code and source_code == target_code:
+        return {
+            "source_language": source_lang,
+            "translated_text": cleaned_text,
+            "target_language": target_code,
+        }
 
     load_dotenv()
     if os.getenv("USE_MOCK_CLASSIFIER", "").lower() == "true" or not os.getenv("GEMINI_API_KEY"):
         return {
-            "source_language": "Auto",
+            "source_language": source_lang or "Auto",
             "translated_text": cleaned_text,
-            "target_language": lang_code,
+            "target_language": target_code,
         }
 
     client = _create_client()
+    source_context = f"from {source_lang} " if source_lang else ""
     prompt = (
         f"You are an expert multilingual civic translator specializing in Indian languages.\n"
         f"Task:\n"
-        f"1. Identify the source language of the input complaint text.\n"
-        f"2. Translate the complaint into natural, fluent {lang_name} in its proper native script.\n"
-        f"3. If the input text is ALREADY in {lang_name}, keep the translated_text identical to the original.\n"
+        f"1. Translate the following civic complaint {source_context}into natural, fluent {target_name} in its proper native script.\n"
+        f"2. If the text is ALREADY in {target_name}, keep the translated_text identical to the original.\n"
         f"Return ONLY valid JSON matching this schema:\n"
-        f'{{"detected_language": "<Language Name>", "translated_text": "<Translated text in {lang_name} script>"}}\n\n'
+        f'{{"detected_language": "{source_lang or "<Language Name>"}", "translated_text": "<Translated text in {target_name} script>"}}\n\n'
         f"Input text:\n{cleaned_text}"
     )
 
@@ -221,19 +252,20 @@ def translate_text(text: str, target_lang: str) -> dict[str, str]:
         raw_output = (response.text or "").strip()
         data = json.loads(raw_output) if raw_output else {}
         translated = (data.get("translated_text") or "").strip()
-        detected = (data.get("detected_language") or "Auto").strip()
+        detected = (data.get("detected_language") or source_lang or "Auto").strip()
         return {
             "source_language": detected,
             "translated_text": translated if translated else cleaned_text,
-            "target_language": lang_code,
+            "target_language": target_code,
         }
     except Exception as exc:
-        logger.warning("Gemini translation failed for %s (%s), falling back to original: %s", target_lang, lang_name, exc)
+        logger.warning("Gemini translation failed for %s (%s), falling back to original: %s", target_lang, target_name, exc)
         return {
-            "source_language": "Auto",
+            "source_language": source_lang or "Auto",
             "translated_text": cleaned_text,
-            "target_language": lang_code,
+            "target_language": target_code,
         }
+
 
 
 
