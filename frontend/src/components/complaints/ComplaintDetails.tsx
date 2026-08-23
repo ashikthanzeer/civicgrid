@@ -175,12 +175,12 @@ export const ComplaintDetails: React.FC<ComplaintDetailsProps> = ({ complaint: i
                   }}
                 >
                   <p className="mb-2 text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5" style={{ color: 'var(--color-primary)' }}>
-                    <span>📸 Gemini Multimodal Vision Analysis</span>
+                    <span>📸 {t.photo.visionAnalysisTitle}</span>
                   </p>
                   {complaint.image_url && (
                     <img
                       src={complaint.image_url}
-                      alt="Citizen photo evidence"
+                      alt={t.photo.evidenceAlt}
                       className="mb-3 max-h-56 rounded-lg object-cover border"
                       style={{ borderColor: 'var(--color-border)' }}
                     />
@@ -232,7 +232,7 @@ export const ComplaintDetails: React.FC<ComplaintDetailsProps> = ({ complaint: i
                       {up.image_url && (
                         <img
                           src={up.image_url}
-                          alt="Complementary visual evidence"
+                          alt={t.photo.evidenceAlt}
                           className="max-h-48 rounded-lg object-cover border mt-2"
                           style={{ borderColor: 'var(--color-border)' }}
                         />
@@ -307,7 +307,7 @@ export const ComplaintDetails: React.FC<ComplaintDetailsProps> = ({ complaint: i
               >
                 <div className="mb-3 flex items-center justify-between">
                   <p className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>
-                    Authorized Municipal Officer Action:
+                    {t.officer.actionLabel}
                   </p>
                   <span className="text-xs font-mono px-2 py-0.5 rounded border" style={{ borderColor: 'var(--color-accent)', color: 'var(--color-accent)' }}>
                     {officerProfile?.officer_id || 'OFFICER-2026'}
@@ -356,10 +356,10 @@ export const ComplaintDetails: React.FC<ComplaintDetailsProps> = ({ complaint: i
                   </div>
                   <div>
                     <h3 className="text-sm font-bold" style={{ color: 'var(--color-text)' }}>
-                      Municipal Officer Status Control
+                      {t.officer.statusControlHeader}
                     </h3>
                     <p className="text-xs" style={{ color: 'var(--color-muted)' }}>
-                      Status updates are restricted to authorized Municipal Officers to prevent complaint hijacking.
+                      {t.officer.statusControlDesc}
                     </p>
                   </div>
                 </div>
@@ -370,7 +370,7 @@ export const ComplaintDetails: React.FC<ComplaintDetailsProps> = ({ complaint: i
                   className="btn-primary shrink-0 text-xs py-2 px-3.5 flex items-center gap-1.5"
                 >
                   <ShieldCheck className="h-4 w-4" />
-                  <span>Officer Sign In</span>
+                  <span>{t.officer.signInLabel}</span>
                 </button>
               </div>
             )}

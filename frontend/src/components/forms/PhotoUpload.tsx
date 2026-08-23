@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Camera, X } from 'lucide-react';
+import { useI18n } from '../../i18n/useI18n';
 
 interface PhotoUploadProps {
   onPhotoSelected: (base64Image: string | null) => void;
@@ -7,6 +8,7 @@ interface PhotoUploadProps {
 }
 
 export const PhotoUpload: React.FC<PhotoUploadProps> = ({ onPhotoSelected, disabled }) => {
+  const { t } = useI18n();
   const [preview, setPreview] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -15,13 +17,13 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({ onPhotoSelected, disab
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      alert('Please upload an image file (JPEG, PNG, WebP).');
+      alert(t.photo.errorFileType);
       return;
     }
 
     // Limit to 5MB
     if (file.size > 5 * 1024 * 1024) {
-      alert('Image size should be less than 5MB.');
+      alert(t.photo.errorFileSize);
       return;
     }
 
@@ -80,16 +82,16 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({ onPhotoSelected, disab
           <div className="flex items-center gap-3 overflow-hidden">
             <img
               src={preview}
-              alt="Uploaded issue preview"
+              alt={t.photo.evidenceAlt}
               className="h-14 w-14 rounded-lg object-cover border"
               style={{ borderColor: 'var(--color-border)' }}
             />
             <div className="min-w-0 flex-1">
               <p className="text-xs font-semibold" style={{ color: 'var(--color-text)' }}>
-                Photo Evidence Attached
+                {t.photo.evidenceAttached}
               </p>
               <p className="text-[11px] truncate" style={{ color: 'var(--color-muted)' }}>
-                Gemini Vision will analyze visual proof
+                {t.photo.visionAnalyze}
               </p>
             </div>
           </div>
@@ -100,7 +102,7 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({ onPhotoSelected, disab
             disabled={disabled}
             className="flex h-7 w-7 items-center justify-center rounded-full border transition-colors hover:bg-red-500/10 hover:border-red-500/30"
             style={{ borderColor: 'var(--color-border)', color: 'var(--color-muted)' }}
-            aria-label="Remove photo"
+            aria-label={t.photo.removePhoto}
           >
             <X className="h-3.5 w-3.5" />
           </button>
@@ -127,10 +129,10 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({ onPhotoSelected, disab
           </div>
           <div>
             <p className="text-xs font-semibold" style={{ color: 'var(--color-text)' }}>
-              Attach Photo Evidence <span className="font-normal text-[11px]" style={{ color: 'var(--color-muted)' }}>(Optional)</span>
+              {t.photo.attachTitle} <span className="font-normal text-[11px]" style={{ color: 'var(--color-muted)' }}>{t.photo.optionalTag}</span>
             </p>
             <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-muted)' }}>
-              Drop an image here, or click to browse / capture
+              {t.photo.dropzoneDesc}
             </p>
           </div>
         </div>

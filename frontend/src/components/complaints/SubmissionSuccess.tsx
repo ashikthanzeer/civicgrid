@@ -146,12 +146,12 @@ export const SubmissionSuccess: React.FC<SubmissionSuccessProps> = ({ complaint,
             }}
           >
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5" style={{ color: 'var(--color-primary)' }}>
-              <span>📸 Gemini Vision Analysis</span>
+              <span>📸 {t.photo.visionAnalysisTitle}</span>
             </p>
             {complaint.image_url && (
               <img
                 src={complaint.image_url}
-                alt="Attached visual evidence"
+                alt={t.photo.evidenceAlt}
                 className="mb-3 max-h-48 rounded-lg object-cover border"
                 style={{ borderColor: 'var(--color-border)' }}
               />

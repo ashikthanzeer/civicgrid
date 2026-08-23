@@ -95,7 +95,7 @@ export const Topbar: React.FC<TopbarProps> = ({ onMenuClick, menuOpen = false })
                 backgroundColor: 'color-mix(in srgb, var(--color-accent) 12%, transparent)',
                 color: 'var(--color-accent)',
               }}
-              title={`Logged in as Municipal Officer: ${officerProfile?.officer_id || 'OFFICER-2026'}`}
+              title={`${t.officer.loggedInAs}: ${officerProfile?.officer_id || 'OFFICER-2026'}`}
             >
               <ShieldCheck className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">{officerProfile?.officer_id || 'Officer'}</span>
@@ -109,7 +109,7 @@ export const Topbar: React.FC<TopbarProps> = ({ onMenuClick, menuOpen = false })
                 color: 'var(--color-muted)',
                 backgroundColor: 'var(--color-background)',
               }}
-              title="Sign out of Officer Portal"
+              title={t.officer.signOutPortal}
             >
               <LogOut className="h-3 w-3" />
             </button>
@@ -124,10 +124,10 @@ export const Topbar: React.FC<TopbarProps> = ({ onMenuClick, menuOpen = false })
               backgroundColor: 'var(--color-background)',
               color: 'var(--color-text)',
             }}
-            title="Authenticate as Municipal Officer to update complaint statuses"
+            title={t.officer.topbarTitle}
           >
             <UserCheck className="h-3.5 w-3.5" style={{ color: 'var(--color-primary)' }} />
-            <span className="hidden sm:inline">Officer Sign In</span>
+            <span className="hidden sm:inline">{t.officer.signInLabel}</span>
           </button>
         )}
       </div>

@@ -7,6 +7,7 @@ import {
 } from '@vis.gl/react-google-maps';
 import { MapPin, Loader2, Search, Navigation } from 'lucide-react';
 import { INDIA_CENTER, LOCATION_PICKER_ZOOM } from '../../utils/constants';
+import { useI18n } from '../../i18n/useI18n';
 
 const MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 
@@ -30,6 +31,7 @@ function PlacesSearchInput({
   onSelectAddress: (address: string, lat: number, lng: number) => void;
   disabled?: boolean;
 }) {
+  const { t } = useI18n();
   const [query, setQuery] = useState('');
   const [predictions, setPredictions] = useState<google.maps.places.AutocompletePrediction[]>([]);
   const [isOpen, setIsOpen] = useState(false);
@@ -112,7 +114,7 @@ function PlacesSearchInput({
           onFocus={() => {
             if (predictions.length > 0) setIsOpen(true);
           }}
-          placeholder="Search for a place in India..."
+          placeholder={t.location.searchPlaceholder}
           disabled={disabled}
           className="w-full rounded-lg border py-2.5 pl-10 pr-3 text-sm transition-colors focus:outline-none"
           style={{
@@ -198,6 +200,7 @@ export const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
   onChange,
   disabled,
 }) => {
+  const { t } = useI18n();
   const [markerPos, setMarkerPos] = useState<{ lat: number; lng: number } | null>(null);
   const [geoLoading, setGeoLoading] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
@@ -222,7 +225,7 @@ export const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
 
   const handleGeolocate = useCallback(() => {
     if (!navigator.geolocation) {
-      setGeoError('Geolocation is not supported by your browser.');
+      setGeoError(t.location.geoNotSupported);
       return;
     }
     setGeoLoading(true);
@@ -248,11 +251,11 @@ export const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
       },
       () => {
         setGeoLoading(false);
-        setGeoError('Could not detect your location. Please search or click on the map.');
+        setGeoError(t.location.geoError);
       },
       { timeout: 8000 },
     );
-  }, [onChange]);
+  }, [onChange, t.location.geoNotSupported, t.location.geoError]);
 
   if (!MAPS_API_KEY) {
     return (
@@ -262,7 +265,7 @@ export const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
       >
         <MapPin className="h-6 w-6" style={{ color: 'var(--color-muted)' }} />
         <p className="text-xs" style={{ color: 'var(--color-muted)' }}>
-          Maps not configured — add <code>VITE_GOOGLE_MAPS_API_KEY</code> to <code>.env.local</code>
+          {t.location.notConfigured}
         </p>
       </div>
     );
@@ -277,8 +280,8 @@ export const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
           type="button"
           onClick={handleGeolocate}
           disabled={disabled || geoLoading}
-          title="Use current location"
-          aria-label="Use current location"
+          title={t.location.useCurrentLocation}
+          aria-label={t.location.useCurrentLocation}
           className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50"
           style={{
             borderColor: 'var(--color-border)',
@@ -291,7 +294,7 @@ export const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
           ) : (
             <Navigation className="h-4 w-4" />
           )}
-          <span className="hidden sm:inline">My Location</span>
+          <span className="hidden sm:inline">{t.location.myLocation}</span>
         </button>
       </div>
 
@@ -361,7 +364,7 @@ export const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
       {/* Hint */}
       {!value && (
         <p className="text-xs" style={{ color: 'var(--color-muted)' }}>
-          Search, click on the map, or use GPS to select your location
+          {t.location.hint}
         </p>
       )}
 

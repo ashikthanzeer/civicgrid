@@ -142,6 +142,7 @@ const SettingsPage: React.FC = () => {
 };
 
 const OfficerSecurityCard: React.FC = () => {
+  const { t } = useI18n();
   const { isOfficer, officerProfile, changeOfficerPassword } = useRole();
   const [oldPassword, setOldPassword] = React.useState('');
   const [newPassword, setNewPassword] = React.useState('');
@@ -157,16 +158,16 @@ const OfficerSecurityCard: React.FC = () => {
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-primary)' }}>
-              Municipal Access Guard
+              {t.officer.guardTitle}
             </p>
             <h2 className="mt-2 text-lg font-semibold" style={{ color: 'var(--color-text)' }}>
-              Officer Security & Password Management
+              {t.officer.guardSubtitle}
             </h2>
           </div>
           <KeyRound className="h-5 w-5 shrink-0" style={{ color: 'var(--color-primary)' }} />
         </div>
         <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--color-muted)' }}>
-          Authenticating as a Municipal Officer unlocks status update controls across complaints.
+          {t.officer.guardDesc}
         </p>
         <div className="mt-4">
           <button
@@ -175,7 +176,7 @@ const OfficerSecurityCard: React.FC = () => {
             className="btn-primary text-xs py-2 px-4 flex items-center gap-1.5"
           >
             <ShieldCheck className="h-4 w-4" />
-            <span>Sign In as Municipal Officer</span>
+            <span>{t.officer.signInBtn}</span>
           </button>
         </div>
         <OfficerLoginModal isOpen={loginModalOpen} onClose={() => setLoginModalOpen(false)} />
@@ -186,15 +187,15 @@ const OfficerSecurityCard: React.FC = () => {
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!oldPassword || !newPassword) {
-      setError('Please fill in both current and new password.');
+      setError(t.officer.errorFillBoth);
       return;
     }
     if (newPassword.length < 6) {
-      setError('New password must be at least 6 characters.');
+      setError(t.officer.errorMinChar);
       return;
     }
     if (newPassword !== confirmPassword) {
-      setError('New password and confirm password do not match.');
+      setError(t.officer.errorMismatch);
       return;
     }
 
@@ -206,12 +207,12 @@ const OfficerSecurityCard: React.FC = () => {
     setLoading(false);
 
     if (res.success) {
-      setMessage(res.message || 'Password changed successfully!');
+      setMessage(res.message || t.officer.successPasswordChange);
       setOldPassword('');
       setNewPassword('');
       setConfirmPassword('');
     } else {
-      setError(res.error || 'Failed to change password. Please check your current password.');
+      setError(res.error || t.officer.errorChangeFailed);
     }
   };
 
@@ -220,10 +221,10 @@ const OfficerSecurityCard: React.FC = () => {
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-accent)' }}>
-            Authenticated Officer Portal
+            {t.officer.portalTitle}
           </p>
           <h2 className="mt-2 text-lg font-semibold" style={{ color: 'var(--color-text)' }}>
-            Change Officer Password ({officerProfile?.officer_id || 'OFFICER-2026'})
+            {t.officer.changePasswordTitle} ({officerProfile?.officer_id || 'OFFICER-2026'})
           </h2>
         </div>
         <KeyRound className="h-5 w-5 shrink-0" style={{ color: 'var(--color-accent)' }} />
@@ -232,7 +233,7 @@ const OfficerSecurityCard: React.FC = () => {
       <form onSubmit={handleChangePassword} className="mt-6 max-w-lg space-y-4">
         <div>
           <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--color-muted)' }}>
-            Current Password
+            {t.officer.currentPassword}
           </label>
           <input
             type="password"
@@ -251,13 +252,13 @@ const OfficerSecurityCard: React.FC = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--color-muted)' }}>
-              New Password
+              {t.officer.newPassword}
             </label>
             <input
               type="password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="Min 6 characters"
+              placeholder={t.officer.newPasswordPlaceholder}
               className="w-full rounded-lg border py-2 px-3 text-sm"
               style={{
                 borderColor: 'var(--color-border)',
@@ -268,13 +269,13 @@ const OfficerSecurityCard: React.FC = () => {
           </div>
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--color-muted)' }}>
-              Confirm New Password
+              {t.officer.confirmPassword}
             </label>
             <input
               type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Re-enter new password"
+              placeholder={t.officer.confirmPasswordPlaceholder}
               className="w-full rounded-lg border py-2 px-3 text-sm"
               style={{
                 borderColor: 'var(--color-border)',
@@ -298,7 +299,7 @@ const OfficerSecurityCard: React.FC = () => {
         )}
 
         <button type="submit" disabled={loading} className="btn-primary text-xs py-2 px-4">
-          {loading ? 'Updating Password...' : 'Update Password'}
+          {loading ? t.officer.updatingPassword : t.officer.updatePasswordBtn}
         </button>
       </form>
     </div>

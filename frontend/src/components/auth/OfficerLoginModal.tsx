@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, ShieldCheck, KeyRound, User, Sparkles, Loader2 } from 'lucide-react';
 import { useRole } from '../../context/RoleContext';
+import { useI18n } from '../../i18n/useI18n';
 
 interface OfficerLoginModalProps {
   isOpen: boolean;
@@ -9,6 +10,7 @@ interface OfficerLoginModalProps {
 }
 
 export const OfficerLoginModal: React.FC<OfficerLoginModalProps> = ({ isOpen, onClose }) => {
+  const { t } = useI18n();
   const { loginAsOfficer } = useRole();
   const [officerId, setOfficerId] = useState('');
   const [password, setPassword] = useState('');
@@ -26,7 +28,7 @@ export const OfficerLoginModal: React.FC<OfficerLoginModalProps> = ({ isOpen, on
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!officerId.trim() || !password) {
-      setError('Please enter both Officer ID and Password.');
+      setError(t.officer.errorRequired);
       return;
     }
 
@@ -40,7 +42,7 @@ export const OfficerLoginModal: React.FC<OfficerLoginModalProps> = ({ isOpen, on
       setOfficerId('');
       setPassword('');
     } else {
-      setError(res.error || 'Authentication failed. Please check your credentials.');
+      setError(res.error || t.officer.errorFailed);
     }
   };
 
@@ -79,10 +81,10 @@ export const OfficerLoginModal: React.FC<OfficerLoginModalProps> = ({ isOpen, on
             </div>
             <div>
               <h2 id="officer-modal-title" className="font-display text-base font-bold" style={{ color: 'var(--color-text)' }}>
-                Municipal Officer Sign In
+                {t.officer.signInTitle}
               </h2>
               <p className="text-xs" style={{ color: 'var(--color-muted)' }}>
-                Authorized Municipal Personnel Access
+                {t.officer.signInSubtitle}
               </p>
             </div>
           </div>
@@ -109,7 +111,7 @@ export const OfficerLoginModal: React.FC<OfficerLoginModalProps> = ({ isOpen, on
           >
             <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--color-text)' }}>
               <Sparkles className="h-4 w-4 shrink-0" style={{ color: 'var(--color-accent)' }} />
-              <span>Evaluating as a Judge? Use demo account</span>
+              <span>{t.officer.demoNotice}</span>
             </div>
             <button
               type="button"
@@ -120,14 +122,14 @@ export const OfficerLoginModal: React.FC<OfficerLoginModalProps> = ({ isOpen, on
                 color: '#ffffff',
               }}
             >
-              Auto-Fill Demo
+              {t.officer.autoFillDemo}
             </button>
           </div>
 
           {/* Officer ID */}
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: 'var(--color-muted)' }}>
-              Officer Identification Code
+              {t.officer.idLabel}
             </label>
             <div className="relative">
               <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: 'var(--color-muted)' }} />
@@ -135,7 +137,7 @@ export const OfficerLoginModal: React.FC<OfficerLoginModalProps> = ({ isOpen, on
                 type="text"
                 value={officerId}
                 onChange={(e) => setOfficerId(e.target.value)}
-                placeholder="e.g. OFFICER-2026"
+                placeholder={t.officer.idPlaceholder}
                 disabled={loading}
                 className="w-full rounded-lg border py-2.5 pl-10 pr-3 text-sm transition-colors focus:outline-none"
                 style={{
@@ -150,7 +152,7 @@ export const OfficerLoginModal: React.FC<OfficerLoginModalProps> = ({ isOpen, on
           {/* Password */}
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: 'var(--color-muted)' }}>
-              Password
+              {t.officer.passwordLabel}
             </label>
             <div className="relative">
               <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: 'var(--color-muted)' }} />
@@ -193,12 +195,12 @@ export const OfficerLoginModal: React.FC<OfficerLoginModalProps> = ({ isOpen, on
               {loading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Authenticating...</span>
+                  <span>{t.officer.authenticating}</span>
                 </>
               ) : (
                 <>
                   <ShieldCheck className="h-4 w-4" />
-                  <span>Sign In as Officer</span>
+                  <span>{t.officer.signInBtn}</span>
                 </>
               )}
             </button>
