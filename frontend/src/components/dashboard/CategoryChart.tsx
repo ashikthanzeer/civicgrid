@@ -33,6 +33,7 @@ export const CategoryChart: React.FC<CategoryChartProps> = ({ complaints }) => {
 
   const counts: Record<string, number> = {};
   complaints.forEach((c) => {
+    if (c.status === 'Rejected / Spam' || c.category === 'Spam / Invalid') return;
     counts[c.category] = (counts[c.category] ?? 0) + 1;
   });
 

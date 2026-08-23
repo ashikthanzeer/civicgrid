@@ -31,9 +31,10 @@ export const UrgencyChart: React.FC<UrgencyChartProps> = ({ complaints }) => {
   const tooltipBg = isDark ? '#171B3A' : '#FFFFFF';
   const tooltipBorder = isDark ? '#2A2F5C' : '#D6D8E8';
 
+  const validComplaints = complaints.filter((c) => c.status !== 'Rejected / Spam' && c.category !== 'Spam / Invalid');
   const data = URGENCY_CONFIG.map(({ key, color }) => ({
     name: key,
-    value: complaints.filter((c) => c.urgency === key).length,
+    value: validComplaints.filter((c) => c.urgency === key).length,
     color,
   }));
 

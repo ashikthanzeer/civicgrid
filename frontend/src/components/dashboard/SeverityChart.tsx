@@ -21,9 +21,10 @@ export const SeverityChart: React.FC<SeverityChartProps> = ({ complaints }) => {
   const legendColor = isDark ? '#9C9FC2' : '#5C6085';
   const strokeColor = isDark ? '#171B3A' : '#FFFFFF';
 
+  const validComplaints = complaints.filter((c) => c.status !== 'Rejected / Spam' && c.category !== 'Spam / Invalid');
   const data = SEVERITY_CONFIG.map(({ key, color }) => ({
     name: key,
-    value: complaints.filter((c) => c.severity === key).length,
+    value: validComplaints.filter((c) => c.severity === key).length,
     color,
   })).filter((d) => d.value > 0);
 

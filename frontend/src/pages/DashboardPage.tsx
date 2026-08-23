@@ -13,6 +13,7 @@ import { useI18n } from '../i18n/useI18n';
 
 function applyFilters(complaints: Complaint[], f: ComplaintFilters): Complaint[] {
   return complaints.filter((c) => {
+    if (c.status === 'Rejected / Spam' || c.category === 'Spam / Invalid') return false;
     if (f.categories?.length && !f.categories.includes(c.category)) return false;
     if (f.locations?.length && !f.locations.includes(c.location)) return false;
     if (f.severities?.length && !f.severities.includes(c.severity)) return false;

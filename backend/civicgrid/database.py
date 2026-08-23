@@ -407,8 +407,8 @@ def update_complaint_status(complaint_id: str, new_status: str) -> dict[str, Any
 
 
 def get_stats() -> dict[str, Any]:
-    """Return aggregate statistics across all primary unique complaints."""
-    stat_filter = "WHERE (is_duplicate = 0 OR is_duplicate IS NULL) AND duplicate_of_id IS NULL"
+    """Return aggregate statistics across all primary non-rejected complaints."""
+    stat_filter = "WHERE (is_duplicate = 0 OR is_duplicate IS NULL) AND duplicate_of_id IS NULL AND status != 'Rejected / Spam' AND category != 'Spam / Invalid'"
     with _lock:
         if _is_postgres():
             with _get_pg_conn() as conn:
