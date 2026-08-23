@@ -49,7 +49,7 @@ if _cors_env and _cors_env != "*":
     app.add_middleware(
         CORSMiddleware,
         allow_origins=_allowed_origins,
-        allow_origin_regex=r"https://.*\.vercel\.app",
+        allow_origin_regex=r"https://.*\.vercel\.app|https://.*\.onrender\.com|http://localhost:\d+",
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -63,6 +63,13 @@ else:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+
+@app.options("/{full_path:path}", include_in_schema=False)
+async def options_preflight_handler(full_path: str):  # noqa: ARG001
+    """Global OPTIONS preflight handler to prevent 405 CORS issues."""
+    return {}
+
 
 
 # ---------------------------------------------------------------------------
@@ -283,6 +290,7 @@ def update_complaint(complaint_id: str, req: UpdateStatusIn) -> ComplaintOut:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     if not row:
         raise HTTPException(status_code=404, detail=f"Complaint '{complaint_id}' not found.")
+    return _clean_complaint(row)
 @app.delete(
     "/api/complaints/{complaint_id}",
     summary="Permanently delete complaint (Officer only)",
