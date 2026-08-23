@@ -51,13 +51,14 @@ export const TTSButton: React.FC<TTSButtonProps> = ({
 
   const translationCache = useRef<Record<string, { text: string; detected?: string }>>({});
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const playSessionIdRef = useRef(0);
 
   // Sync selected language when global UI language changes (if not actively playing)
   useEffect(() => {
-    if (!isPlaying) {
+    if (!isPlaying && !isTranslating) {
       setSelectedLang(language);
     }
-  }, [language, isPlaying]);
+  }, [language, isPlaying, isTranslating]);
 
   // Clean up on unmount
   useEffect(() => {
@@ -83,16 +84,22 @@ export const TTSButton: React.FC<TTSButtonProps> = ({
 
   const activeLangMeta = SUPPORTED_LANGUAGES.find((l) => l.code === selectedLang) || SUPPORTED_LANGUAGES[0];
 
-  const handlePlayInLanguage = useCallback(
-    async (targetLang: SupportedLanguage) => {
-      if (isPlaying) {
-        stopSpeech();
-        setIsPlaying(false);
-        return;
-      }
+  const handleStop = useCallback(() => {
+    playSessionIdRef.current += 1;
+    stopSpeech();
+    setIsPlaying(false);
+    setIsTranslating(false);
+  }, []);
 
+  const handleStartPlay = useCallback(
+    async (targetLang: SupportedLanguage) => {
       if (!text || text.trim() === '') return;
 
+      // Always stop any current playback first
+      stopSpeech();
+      setIsPlaying(false);
+
+      const currentSessionId = ++playSessionIdRef.current;
       const sourceCode = sourceLanguage
         ? LANG_NAME_TO_CODE[sourceLanguage.trim().toLowerCase()]
         : undefined;
@@ -104,8 +111,12 @@ export const TTSButton: React.FC<TTSButtonProps> = ({
         const success = speakText(
           text,
           targetLang,
-          () => setIsPlaying(false),
-          () => setIsPlaying(false),
+          () => {
+            if (playSessionIdRef.current === currentSessionId) setIsPlaying(false);
+          },
+          () => {
+            if (playSessionIdRef.current === currentSessionId) setIsPlaying(false);
+          },
         );
         if (success) setIsPlaying(true);
         return;
@@ -123,6 +134,9 @@ export const TTSButton: React.FC<TTSButtonProps> = ({
         setIsTranslating(true);
         try {
           const res = await translateComplaintText(text, targetLang, sourceLanguage);
+          // If user triggered another action while translating, discard stale response
+          if (playSessionIdRef.current !== currentSessionId) return;
+
           textToSpeak = res.translatedText || text;
           translationCache.current[cacheKey] = {
             text: textToSpeak,
@@ -131,38 +145,49 @@ export const TTSButton: React.FC<TTSButtonProps> = ({
           setTranslatedText(textToSpeak);
           setDetectedLang(res.detectedLanguage || sourceLanguage || null);
         } catch {
+          if (playSessionIdRef.current !== currentSessionId) return;
           textToSpeak = text;
           setTranslatedText(text);
         } finally {
-          setIsTranslating(false);
+          if (playSessionIdRef.current === currentSessionId) {
+            setIsTranslating(false);
+          }
         }
       }
+
+      if (playSessionIdRef.current !== currentSessionId) return;
 
       const success = speakText(
         textToSpeak,
         targetLang,
-        () => setIsPlaying(false),
-        () => setIsPlaying(false),
+        () => {
+          if (playSessionIdRef.current === currentSessionId) setIsPlaying(false);
+        },
+        () => {
+          if (playSessionIdRef.current === currentSessionId) setIsPlaying(false);
+        },
       );
 
       if (success) {
         setIsPlaying(true);
       }
     },
-    [isPlaying, text, sourceLanguage],
+    [text, sourceLanguage],
   );
 
   const handleLanguageSelect = (langCode: SupportedLanguage) => {
     setSelectedLang(langCode);
     setDropdownOpen(false);
-    if (isPlaying) {
-      stopSpeech();
-      setIsPlaying(false);
+    // Instant seamless auto-play in the selected language without lag
+    handleStartPlay(langCode);
+  };
+
+  const handleMainButtonClick = () => {
+    if (isPlaying || isTranslating) {
+      handleStop();
+    } else {
+      handleStartPlay(selectedLang);
     }
-    // Auto-play immediately in selected language
-    setTimeout(() => {
-      handlePlayInLanguage(langCode);
-    }, 50);
   };
 
   return (
@@ -179,8 +204,7 @@ export const TTSButton: React.FC<TTSButtonProps> = ({
         {/* Main Speak / Stop Button */}
         <button
           type="button"
-          onClick={() => handlePlayInLanguage(selectedLang)}
-          disabled={isTranslating}
+          onClick={handleMainButtonClick}
           title={isPlaying ? 'Stop audio playback' : `Listen in ${activeLangMeta.nativeLabel}`}
           aria-label={isPlaying ? 'Stop audio playback' : `Listen in ${activeLangMeta.nativeLabel}`}
           className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold transition-all hover:opacity-90 active:scale-95 disabled:opacity-50"
