@@ -83,3 +83,15 @@ class ChangePasswordIn(BaseModel):
 class ChangePasswordOut(BaseModel):
     success: bool
     message: str
+
+
+class TranslateTextIn(BaseModel):
+    text: str = Field(min_length=1, max_length=3000, description="Source text to translate")
+    target_language: str = Field(min_length=2, max_length=20, description="Target language code (e.g., hi, ml, ta, te, kn, bn, mr, en)")
+
+
+class TranslateTextOut(BaseModel):
+    original_text: str
+    translated_text: str
+    target_language: str
+

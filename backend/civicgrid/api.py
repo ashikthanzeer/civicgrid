@@ -22,6 +22,8 @@ from .models import (
     OfficerLoginOut,
     ChangePasswordIn,
     ChangePasswordOut,
+    TranslateTextIn,
+    TranslateTextOut,
 )
 
 logger = logging.getLogger(__name__)
@@ -342,6 +344,24 @@ def change_password(req: ChangePasswordIn) -> ChangePasswordOut:
     return ChangePasswordOut(success=True, message="Officer password successfully updated.")
 
 
+@app.post(
+    "/api/translate",
+    response_model=TranslateTextOut,
+    summary="Translate text to another language using Gemini AI",
+    tags=["translation"],
+)
+def translate_text_endpoint(req: TranslateTextIn) -> TranslateTextOut:
+    """Translate civic complaint text or summary to target language."""
+    from .gemini import translate_text
+    translated = translate_text(req.text, req.target_language)
+    return TranslateTextOut(
+        original_text=req.text,
+        translated_text=translated,
+        target_language=req.target_language,
+    )
+
+
 @app.get("/api/health", summary="Health check", tags=["system"])
 def health() -> dict:
     return {"status": "ok", "version": "1.0.0"}
+

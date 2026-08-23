@@ -61,3 +61,30 @@ export const getStats = async (): Promise<StatsResponse> => {
   }
   return apiClient<StatsResponse>('/api/complaints/stats');
 };
+
+export interface TranslateResponse {
+  original_text: string;
+  translated_text: string;
+  target_language: string;
+}
+
+export const translateComplaintText = async (
+  text: string,
+  targetLanguage: string,
+): Promise<string> => {
+  if (!text || targetLanguage === 'en') return text;
+  if (isMockMode) {
+    return text;
+  }
+  try {
+    const res = await apiClient<TranslateResponse>('/api/translate', {
+      method: 'POST',
+      body: JSON.stringify({ text, target_language: targetLanguage }),
+    });
+    return res.translated_text || text;
+  } catch (err) {
+    console.warn('Translation API failed, using original text:', err);
+    return text;
+  }
+};
+

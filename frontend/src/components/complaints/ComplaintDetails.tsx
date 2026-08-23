@@ -152,7 +152,7 @@ export const ComplaintDetails: React.FC<ComplaintDetailsProps> = ({ complaint: i
                 <ShieldAlert className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
                 {t.details.citizenVoice}
               </h2>
-              <TTSButton text={complaint.summary || complaint.raw_text} />
+              <TTSButton text={complaint.raw_text || complaint.summary} />
             </div>
             <div
               className="rounded-xl p-6 relative overflow-hidden"
@@ -434,9 +434,12 @@ export const ComplaintDetails: React.FC<ComplaintDetailsProps> = ({ complaint: i
 
               {complaint.summary && (
                 <div className="border-t pt-4" style={{ borderColor: 'var(--color-border)' }}>
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-muted)' }}>
-                    {t.submit.extractedSummary}
-                  </p>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-muted)' }}>
+                      {t.submit.extractedSummary}
+                    </p>
+                    <TTSButton text={complaint.summary} showSubtitle={false} />
+                  </div>
                   <p className="text-sm leading-relaxed" style={{ color: 'var(--color-text)' }}>{complaint.summary}</p>
                 </div>
               )}

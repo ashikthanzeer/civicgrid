@@ -167,3 +167,50 @@ def classify_complaint(text: str, image_b64: str | None = None) -> CivicComplain
             f"Gemini complaint extraction failed: {type(exc).__name__}: {exc}"
         ) from exc
     return _parse_structured_response(response)
+
+
+LANGUAGE_NAMES: dict[str, str] = {
+    "en": "English",
+    "hi": "Hindi (हिन्दी)",
+    "ml": "Malayalam (മലയാളം)",
+    "ta": "Tamil (தமிழ்)",
+    "te": "Telugu (తెలుగు)",
+    "kn": "Kannada (ಕನ್ನಡ)",
+    "bn": "Bengali (বাংলা)",
+    "mr": "Marathi (मराठी)",
+}
+
+
+def translate_text(text: str, target_lang: str) -> str:
+    """Translate civic complaint text into target language using Gemini."""
+    cleaned_text = _validate_input(text)
+    lang_code = target_lang.lower().split("-")[0]
+    lang_name = LANGUAGE_NAMES.get(lang_code, target_lang)
+
+    if lang_code == "en" and cleaned_text.isascii():
+        return cleaned_text
+
+    load_dotenv()
+    if os.getenv("USE_MOCK_CLASSIFIER", "").lower() == "true" or not os.getenv("GEMINI_API_KEY"):
+        return f"[{lang_name}] {cleaned_text}"
+
+    client = _create_client()
+    prompt = (
+        f"You are an expert translator for civic complaints in Indian languages. "
+        f"Translate the following civic complaint text into natural, accurate, and fluent {lang_name}. "
+        f"Output ONLY the translated text in the native script, with no extra intro, no explanations, and no quotes.\n\n"
+        f"Text to translate:\n{cleaned_text}"
+    )
+
+    try:
+        response = client.models.generate_content(
+            model=_get_model_name(),
+            contents=[prompt],
+        )
+        translated = (response.text or "").strip()
+        return translated if translated else cleaned_text
+    except Exception as exc:
+        logger.warning("Gemini translation failed for %s (%s), falling back to original: %s", target_lang, lang_name, exc)
+        return cleaned_text
+
+

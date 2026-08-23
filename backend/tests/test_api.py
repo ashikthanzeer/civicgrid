@@ -204,3 +204,14 @@ def test_fuzzy_landmark_pincode_duplicate_matching():
     assert body2["citizen_reports_count"] == 2
 
 
+def test_translate_endpoint():
+    r = client.post("/api/translate", json={"text": "Water leakage on Main Street", "target_language": "hi"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["original_text"] == "Water leakage on Main Street"
+    assert body["target_language"] == "hi"
+    assert len(body["translated_text"]) > 0
+
+
+
+
