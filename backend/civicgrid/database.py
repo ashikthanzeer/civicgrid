@@ -154,19 +154,33 @@ def init_db() -> None:
 
 def _next_id_sqlite(conn: sqlite3.Connection) -> str:
     year = datetime.now(timezone.utc).year
-    row = conn.execute("SELECT COUNT(*) FROM complaints").fetchone()
-    n = (row[0] or 0) + 1
-    return f"COMP-{year}-{n:04d}"
+    prefix = f"COMP-{year}-"
+    row = conn.execute("SELECT MAX(id) FROM complaints WHERE id LIKE ?", (prefix + "%",)).fetchone()
+    if row and row[0]:
+        try:
+            n = int(row[0].split("-")[-1]) + 1
+        except (ValueError, IndexError):
+            n = 1
+    else:
+        n = 1
+    return f"{prefix}{n:04d}"
 
 
 def _next_id_pg(conn) -> str:
     year = datetime.now(timezone.utc).year
+    prefix = f"COMP-{year}-"
     with conn.cursor() as cur:
-        cur.execute("SELECT COUNT(*) FROM complaints")
+        cur.execute("SELECT MAX(id) FROM complaints WHERE id LIKE %s", (prefix + "%",))
         row = cur.fetchone()
-        count = list(row.values())[0] if isinstance(row, dict) else row[0]
-        n = (count or 0) + 1
-        return f"COMP-{year}-{n:04d}"
+        max_id = list(row.values())[0] if isinstance(row, dict) else row[0]
+        if max_id:
+            try:
+                n = int(max_id.split("-")[-1]) + 1
+            except (ValueError, IndexError):
+                n = 1
+        else:
+            n = 1
+        return f"{prefix}{n:04d}"
 
 
 def insert_complaint(
