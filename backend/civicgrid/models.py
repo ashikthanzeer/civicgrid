@@ -94,4 +94,5 @@ class TranslateTextOut(BaseModel):
     original_text: str
     translated_text: str
     target_language: str
+    detected_language: str = "auto"
 

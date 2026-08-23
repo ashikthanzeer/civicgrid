@@ -351,13 +351,14 @@ def change_password(req: ChangePasswordIn) -> ChangePasswordOut:
     tags=["translation"],
 )
 def translate_text_endpoint(req: TranslateTextIn) -> TranslateTextOut:
-    """Translate civic complaint text or summary to target language."""
+    """Auto-detect language and translate civic complaint text or summary to target language."""
     from .gemini import translate_text
-    translated = translate_text(req.text, req.target_language)
+    result = translate_text(req.text, req.target_language)
     return TranslateTextOut(
         original_text=req.text,
-        translated_text=translated,
-        target_language=req.target_language,
+        translated_text=result["translated_text"],
+        target_language=result["target_language"],
+        detected_language=result["source_language"],
     )
 
 

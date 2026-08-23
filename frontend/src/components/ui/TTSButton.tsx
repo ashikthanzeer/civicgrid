@@ -25,11 +25,12 @@ export const TTSButton: React.FC<TTSButtonProps> = ({
   const [isTranslating, setIsTranslating] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [translatedText, setTranslatedText] = useState<string | null>(null);
+  const [detectedLang, setDetectedLang] = useState<string | null>(null);
 
-  const translationCache = useRef<Record<string, string>>({});
+  const translationCache = useRef<Record<string, { text: string; detected?: string }>>({});
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Sync selected language when global UI language changes (if not playing)
+  // Sync selected language when global UI language changes (if not actively playing)
   useEffect(() => {
     if (!isPlaying) {
       setSelectedLang(language);
@@ -70,28 +71,33 @@ export const TTSButton: React.FC<TTSButtonProps> = ({
 
       if (!text || text.trim() === '') return;
 
+      const cacheKey = `${targetLang}_${text}`;
       let textToSpeak = text;
 
-      if (targetLang !== 'en') {
-        const cacheKey = `${targetLang}_${text}`;
-        if (translationCache.current[cacheKey]) {
-          textToSpeak = translationCache.current[cacheKey];
-          setTranslatedText(textToSpeak);
-        } else {
-          setIsTranslating(true);
-          try {
-            const translated = await translateComplaintText(text, targetLang);
-            translationCache.current[cacheKey] = translated;
-            textToSpeak = translated;
-            setTranslatedText(translated);
-          } catch {
-            textToSpeak = text;
-          } finally {
-            setIsTranslating(false);
-          }
-        }
+      if (translationCache.current[cacheKey]) {
+        const cached = translationCache.current[cacheKey];
+        textToSpeak = cached.text;
+        setTranslatedText(cached.text);
+        if (cached.detected) setDetectedLang(cached.detected);
       } else {
-        setTranslatedText(null);
+        setIsTranslating(true);
+        try {
+          const res = await translateComplaintText(text, targetLang);
+          textToSpeak = res.translatedText || text;
+          translationCache.current[cacheKey] = {
+            text: textToSpeak,
+            detected: res.detectedLanguage,
+          };
+          setTranslatedText(textToSpeak);
+          if (res.detectedLanguage) {
+            setDetectedLang(res.detectedLanguage);
+          }
+        } catch {
+          textToSpeak = text;
+          setTranslatedText(text);
+        } finally {
+          setIsTranslating(false);
+        }
       }
 
       const success = speakText(
@@ -115,7 +121,7 @@ export const TTSButton: React.FC<TTSButtonProps> = ({
       stopSpeech();
       setIsPlaying(false);
     }
-    // Auto-play immediately in selected language for smooth UX
+    // Auto-play immediately in selected language
     setTimeout(() => {
       handlePlayInLanguage(langCode);
     }, 50);
@@ -123,7 +129,8 @@ export const TTSButton: React.FC<TTSButtonProps> = ({
 
   return (
     <div className="relative inline-flex flex-col gap-1.5" ref={dropdownRef}>
-      <div className={`inline-flex items-center rounded-lg border shadow-sm ${className}`}
+      <div
+        className={`inline-flex items-center rounded-lg border shadow-sm ${className}`}
         style={{
           borderColor: isPlaying ? 'var(--color-primary)' : 'var(--color-border)',
           backgroundColor: isPlaying
@@ -136,8 +143,8 @@ export const TTSButton: React.FC<TTSButtonProps> = ({
           type="button"
           onClick={() => handlePlayInLanguage(selectedLang)}
           disabled={isTranslating}
-          title={isPlaying ? 'Stop audio playback' : `Listen to complaint in ${activeLangMeta.nativeLabel}`}
-          aria-label={isPlaying ? 'Stop audio playback' : `Listen to complaint in ${activeLangMeta.nativeLabel}`}
+          title={isPlaying ? 'Stop audio playback' : `Listen in ${activeLangMeta.nativeLabel}`}
+          aria-label={isPlaying ? 'Stop audio playback' : `Listen in ${activeLangMeta.nativeLabel}`}
           className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold transition-all hover:opacity-90 active:scale-95 disabled:opacity-50"
           style={{
             color: isPlaying ? 'var(--color-primary)' : 'var(--color-text)',
@@ -146,7 +153,7 @@ export const TTSButton: React.FC<TTSButtonProps> = ({
           {isTranslating ? (
             <>
               <Loader2 className="h-3.5 w-3.5 animate-spin" style={{ color: 'var(--color-primary)' }} />
-              <span className="text-[11px] opacity-80">Translating...</span>
+              <span className="text-[11px] opacity-80">Translating to {activeLangMeta.nativeLabel}...</span>
             </>
           ) : isPlaying ? (
             <>
@@ -163,14 +170,14 @@ export const TTSButton: React.FC<TTSButtonProps> = ({
 
         <div className="h-4 w-px bg-[var(--color-border)] opacity-60" />
 
-        {/* Language Selection Pill / Dropdown Toggle */}
+        {/* Language Selection Dropdown Trigger */}
         <button
           type="button"
           onClick={() => setDropdownOpen((prev) => !prev)}
-          title="Select language to listen in"
-          aria-label="Select language to listen in"
+          title="Change audio language"
+          aria-label="Change audio language"
           aria-expanded={dropdownOpen}
-          className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-[color-mix(in_srgb,var(--color-primary)_12%,transparent)] rounded-r-lg"
+          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-[color-mix(in_srgb,var(--color-primary)_12%,transparent)] rounded-r-lg"
           style={{
             color: isPlaying ? 'var(--color-primary)' : 'var(--color-muted)',
           }}
@@ -184,13 +191,13 @@ export const TTSButton: React.FC<TTSButtonProps> = ({
       {/* Language Selection Popover */}
       {dropdownOpen && (
         <div
-          className="absolute left-0 top-full z-50 mt-1 w-48 rounded-xl border p-1.5 shadow-xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-100"
+          className="absolute left-0 top-full z-50 mt-1 w-52 rounded-xl border p-1.5 shadow-xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-100"
           style={{
             backgroundColor: 'var(--color-surface)',
             borderColor: 'var(--color-border)',
           }}
         >
-          <p className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--color-muted)' }}>
+          <p className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--color-muted)' }}>
             Listen in Language:
           </p>
           <div className="space-y-0.5">
@@ -222,19 +229,26 @@ export const TTSButton: React.FC<TTSButtonProps> = ({
         </div>
       )}
 
-      {/* Subtitle / Translated script readout when playing non-English */}
-      {showSubtitle && translatedText && selectedLang !== 'en' && isPlaying && (
+      {/* Subtitle / Translated script readout when playing */}
+      {showSubtitle && translatedText && isPlaying && (
         <div
-          className="rounded-lg border px-3 py-1.5 text-xs font-medium animate-in fade-in slide-in-from-top-1"
+          className="rounded-lg border px-3 py-2 text-xs font-medium animate-in fade-in slide-in-from-top-1 max-w-md"
           style={{
             borderColor: 'color-mix(in srgb, var(--color-primary) 30%, transparent)',
             backgroundColor: 'color-mix(in srgb, var(--color-primary) 6%, transparent)',
             color: 'var(--color-text)',
           }}
         >
-          <span className="text-[10px] font-bold uppercase tracking-wide block mb-0.5" style={{ color: 'var(--color-primary)' }}>
-            🗣️ {activeLangMeta.nativeLabel}:
-          </span>
+          <div className="flex items-center justify-between gap-2 mb-1">
+            <span className="text-[10px] font-bold uppercase tracking-wide flex items-center gap-1" style={{ color: 'var(--color-primary)' }}>
+              <span>🗣️ Audio ({activeLangMeta.nativeLabel})</span>
+            </span>
+            {detectedLang && detectedLang !== 'Auto' && (
+              <span className="text-[9px] px-1.5 py-0.2 rounded font-medium opacity-75 border" style={{ borderColor: 'var(--color-border)' }}>
+                Source: {detectedLang}
+              </span>
+            )}
+          </div>
           <p className="leading-relaxed italic">"{translatedText}"</p>
         </div>
       )}

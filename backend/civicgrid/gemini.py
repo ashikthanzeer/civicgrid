@@ -181,36 +181,59 @@ LANGUAGE_NAMES: dict[str, str] = {
 }
 
 
-def translate_text(text: str, target_lang: str) -> str:
-    """Translate civic complaint text into target language using Gemini."""
+import json
+
+
+def translate_text(text: str, target_lang: str) -> dict[str, str]:
+    """Auto-detect source language and translate civic complaint text into target language using Gemini."""
     cleaned_text = _validate_input(text)
     lang_code = target_lang.lower().split("-")[0]
     lang_name = LANGUAGE_NAMES.get(lang_code, target_lang)
 
-    if lang_code == "en" and cleaned_text.isascii():
-        return cleaned_text
-
     load_dotenv()
     if os.getenv("USE_MOCK_CLASSIFIER", "").lower() == "true" or not os.getenv("GEMINI_API_KEY"):
-        return f"[{lang_name}] {cleaned_text}"
+        return {
+            "source_language": "Auto",
+            "translated_text": cleaned_text,
+            "target_language": lang_code,
+        }
 
     client = _create_client()
     prompt = (
-        f"You are an expert translator for civic complaints in Indian languages. "
-        f"Translate the following civic complaint text into natural, accurate, and fluent {lang_name}. "
-        f"Output ONLY the translated text in the native script, with no extra intro, no explanations, and no quotes.\n\n"
-        f"Text to translate:\n{cleaned_text}"
+        f"You are an expert multilingual civic translator specializing in Indian languages.\n"
+        f"Task:\n"
+        f"1. Identify the source language of the input complaint text.\n"
+        f"2. Translate the complaint into natural, fluent {lang_name} in its proper native script.\n"
+        f"3. If the input text is ALREADY in {lang_name}, keep the translated_text identical to the original.\n"
+        f"Return ONLY valid JSON matching this schema:\n"
+        f'{{"detected_language": "<Language Name>", "translated_text": "<Translated text in {lang_name} script>"}}\n\n'
+        f"Input text:\n{cleaned_text}"
     )
 
     try:
         response = client.models.generate_content(
             model=_get_model_name(),
             contents=[prompt],
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+            ),
         )
-        translated = (response.text or "").strip()
-        return translated if translated else cleaned_text
+        raw_output = (response.text or "").strip()
+        data = json.loads(raw_output) if raw_output else {}
+        translated = (data.get("translated_text") or "").strip()
+        detected = (data.get("detected_language") or "Auto").strip()
+        return {
+            "source_language": detected,
+            "translated_text": translated if translated else cleaned_text,
+            "target_language": lang_code,
+        }
     except Exception as exc:
         logger.warning("Gemini translation failed for %s (%s), falling back to original: %s", target_lang, lang_name, exc)
-        return cleaned_text
+        return {
+            "source_language": "Auto",
+            "translated_text": cleaned_text,
+            "target_language": lang_code,
+        }
+
 
 
