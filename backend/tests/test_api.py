@@ -213,5 +213,12 @@ def test_translate_endpoint():
     assert len(body["translated_text"]) > 0
 
 
+def test_tts_endpoint():
+    r = client.get("/api/tts", params={"text": "Test", "lang": "en"})
+    # Either 200 with audio/mpeg from upstream or 502 in isolated test environment
+    assert r.status_code in (200, 502)
+
+
+
 
 

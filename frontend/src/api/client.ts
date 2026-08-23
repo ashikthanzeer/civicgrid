@@ -1,7 +1,7 @@
 const USE_MOCK = import.meta.env.VITE_USE_MOCK_API === 'true';
 const RAW_API_BASE = import.meta.env.VITE_API_BASE_URL || '';
 // Ensure no trailing slash so ${API_BASE}${endpoint} is always well-formed
-const API_BASE = RAW_API_BASE.replace(/\/+$/, '');
+export const API_BASE = RAW_API_BASE.replace(/\/+$/, '');
 
 export async function apiClient<T>(
   endpoint: string,

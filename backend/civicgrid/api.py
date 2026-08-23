@@ -362,7 +362,45 @@ def translate_text_endpoint(req: TranslateTextIn) -> TranslateTextOut:
     )
 
 
+@app.get(
+    "/api/tts",
+    summary="Generate high-quality native audio stream for regional languages",
+    tags=["translation"],
+)
+async def tts_endpoint(text: str = Query(..., max_length=1000), lang: str = Query("en", max_length=10)):
+    """Return high-quality native MP3 audio stream for Malayalam and Indian regional languages."""
+    import urllib.parse
+    import httpx
+    from fastapi.responses import Response
+
+    lang_code = lang.lower().split("-")[0]
+    encoded_text = urllib.parse.quote(text[:500])
+    google_tts_url = f"https://translate.google.com/translate_tts?ie=UTF-8&tl={lang_code}&client=tw-ob&q={encoded_text}"
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            resp = await client.get(google_tts_url, headers=headers)
+            if resp.status_code == 200 and resp.content:
+                return Response(
+                    content=resp.content,
+                    media_type="audio/mpeg",
+                    headers={
+                        "Cache-Control": "public, max-age=86400",
+                        "Accept-Ranges": "bytes",
+                    },
+                )
+    except Exception as exc:
+        logger.warning("TTS audio fetch failed for %s: %s", lang, exc)
+
+    raise HTTPException(status_code=502, detail="TTS service temporarily unavailable")
+
+
 @app.get("/api/health", summary="Health check", tags=["system"])
 def health() -> dict:
     return {"status": "ok", "version": "1.0.0"}
+
 

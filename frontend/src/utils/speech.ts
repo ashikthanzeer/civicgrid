@@ -1,5 +1,6 @@
-// Web Speech API Text-to-Speech (TTS) utility supporting Indian languages
+// Multilingual Text-to-Speech (TTS) utility with Native Audio Streaming & Web Speech API fallback
 import type { SupportedLanguage } from '../i18n/types';
+import { API_BASE } from '../api/client';
 
 const LANG_VOICE_CODES: Record<SupportedLanguage, string> = {
   en: 'en-IN',
@@ -23,6 +24,7 @@ const LANG_KEYWORDS: Record<SupportedLanguage, string[]> = {
   bn: ['bengali', 'bangla', 'বাংলা', 'bn-in', 'bn_in', 'bashkar', 'tanishaa'],
 };
 
+let currentAudio: HTMLAudioElement | null = null;
 let cachedVoices: SpeechSynthesisVoice[] = [];
 
 if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
@@ -63,30 +65,80 @@ export function findVoiceForLanguage(lang: SupportedLanguage): SpeechSynthesisVo
   return undefined;
 }
 
+/**
+ * Speaks text using the high-fidelity native audio stream (with Web Speech API fallback).
+ * This ensures Malayalam, Tamil, Telugu, Kannada, Hindi, Bengali, Marathi, and English
+ * work reliably on every browser and OS, even if Windows/Mac lacks the regional voice pack.
+ */
 export function speakText(
   text: string,
   lang: SupportedLanguage = 'en',
   onEnd?: () => void,
   onError?: () => void,
 ): boolean {
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-    console.warn('Speech synthesis is not supported in this browser.');
+  if (typeof window === 'undefined') {
     onError?.();
     return false;
   }
 
-  // Cancel any ongoing speech
-  window.speechSynthesis.cancel();
+  // Cancel any ongoing audio or speech
+  stopSpeech();
 
   if (!text || text.trim() === '') {
     onEnd?.();
     return false;
   }
 
+  const langCode = lang.toLowerCase().split('-')[0];
+
+  // 1. Try Native Audio Stream endpoint
+  try {
+    const audioUrl = `${API_BASE}/api/tts?text=${encodeURIComponent(text.slice(0, 450))}&lang=${langCode}`;
+    const audio = new Audio(audioUrl);
+    currentAudio = audio;
+
+    audio.onended = () => {
+      currentAudio = null;
+      onEnd?.();
+    };
+
+    audio.onerror = () => {
+      currentAudio = null;
+      // Fallback to browser SpeechSynthesis
+      fallbackSpeechSynthesis(text, lang, onEnd, onError);
+    };
+
+    const playPromise = audio.play();
+    if (playPromise !== undefined) {
+      playPromise.catch((err) => {
+        console.warn('Audio stream autoplay blocked or failed, using speech synthesis fallback:', err);
+        fallbackSpeechSynthesis(text, lang, onEnd, onError);
+      });
+    }
+    return true;
+  } catch (err) {
+    console.warn('Native audio initialization error, falling back:', err);
+    return fallbackSpeechSynthesis(text, lang, onEnd, onError);
+  }
+}
+
+function fallbackSpeechSynthesis(
+  text: string,
+  lang: SupportedLanguage,
+  onEnd?: () => void,
+  onError?: () => void,
+): boolean {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+    onError?.();
+    return false;
+  }
+
+  window.speechSynthesis.cancel();
+
   const utterance = new SpeechSynthesisUtterance(text);
   const targetVoiceCode = LANG_VOICE_CODES[lang] || 'en-IN';
   utterance.lang = targetVoiceCode;
-  utterance.rate = 0.92; // Natural cadence for Indian speech synthesis
+  utterance.rate = 0.92;
   utterance.pitch = 1.0;
 
   const matchedVoice = findVoiceForLanguage(lang);
@@ -98,8 +150,7 @@ export function speakText(
     onEnd?.();
   };
 
-  utterance.onerror = (e) => {
-    console.warn('SpeechSynthesis error:', e);
+  utterance.onerror = () => {
     onError?.();
   };
 
@@ -108,12 +159,23 @@ export function speakText(
 }
 
 export function stopSpeech(): void {
+  if (currentAudio) {
+    try {
+      currentAudio.pause();
+      currentAudio.currentTime = 0;
+    } catch {
+      // ignore
+    }
+    currentAudio = null;
+  }
+
   if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
     window.speechSynthesis.cancel();
   }
 }
 
 export function isSpeaking(): boolean {
+  if (currentAudio && !currentAudio.paused) return true;
   if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
     return window.speechSynthesis.speaking;
   }
