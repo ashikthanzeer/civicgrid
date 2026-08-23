@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { FileText, X, Loader2 } from 'lucide-react';
 import { useI18n } from '../../i18n/useI18n';
+import { API_BASE } from '../../api/client';
 
 interface PolicyBriefModalProps {
   isOpen: boolean;
@@ -24,7 +25,7 @@ export const PolicyBriefModal: React.FC<PolicyBriefModalProps> = ({ isOpen, onCl
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/reports/policy-brief`);
+      const response = await fetch(`${API_BASE}/api/reports/policy-brief`);
       if (!response.ok) throw new Error('Failed to fetch policy brief');
       const text = await response.text();
       setReport(text);
