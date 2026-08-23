@@ -138,9 +138,17 @@ def test_update_status():
     submit = client.post("/api/complaints", json={"text": "Broken drain cover flooding our street every time it rains.", "location": "Ward 6"})
     complaint_id = submit.json()["complaint"]["id"]
 
-    r = client.patch(f"/api/complaints/{complaint_id}", json={"status": "In Progress"})
-    assert r.status_code == 200
-    assert r.json()["status"] == "In Progress"
+    r1 = client.patch(f"/api/complaints/{complaint_id}", json={"status": "Under Review"})
+    assert r1.status_code == 200
+    assert r1.json()["status"] == "Under Review"
+
+    r2 = client.patch(f"/api/complaints/{complaint_id}", json={"status": "Assigned"})
+    assert r2.status_code == 200
+    assert r2.json()["status"] == "Assigned"
+
+    r3 = client.patch(f"/api/complaints/{complaint_id}", json={"status": "In Progress"})
+    assert r3.status_code == 200
+    assert r3.json()["status"] == "In Progress"
 
 
 def test_update_status_invalid_returns_422():
@@ -248,6 +256,10 @@ def test_resolve_and_verify_complaint_flow():
     r = client.post("/api/complaints", json={"text": "Garbage dump cleared request in sector 3.", "location": "Ward 3"})
     cid = r.json()["complaint"]["id"]
 
+    # Must be assigned / in progress first before resolving according to state machine rules
+    client.post(f"/api/complaints/{cid}/assign", json={"department": "Sanitation", "assigned_to": "Officer A"})
+    client.patch(f"/api/complaints/{cid}", json={"status": "In Progress"})
+
     resolve_res = client.post(
         f"/api/complaints/{cid}/resolve",
         json={"note": "Cleaned up garbage using excavator and disinfected area.", "evidence_image": "https://example.com/proof.jpg"},
@@ -268,6 +280,43 @@ def test_resolve_and_verify_complaint_flow():
     assert "CREATED" in event_types
     assert "RESOLVED" in event_types
     assert "VERIFIED_SATISFIED" in event_types
+
+
+def test_state_machine_invalid_transition_rejected():
+    r = client.post("/api/complaints", json={"text": "Road cavity forming on main intersection.", "location": "Ward 8"})
+    cid = r.json()["complaint"]["id"]
+
+    # Direct transition from New -> Resolved without assignment or in progress is forbidden
+    bad_res = client.patch(f"/api/complaints/{cid}", json={"status": "Resolved"})
+    assert bad_res.status_code == 422
+
+
+def test_verification_only_allowed_on_resolved():
+    r = client.post("/api/complaints", json={"text": "Streetlight broken on 4th cross avenue.", "location": "Ward 1"})
+    cid = r.json()["complaint"]["id"]
+
+    # Verification on New complaint should fail
+    bad_verify = client.post(f"/api/complaints/{cid}/verify", json={"result": "Verified"})
+    assert bad_verify.status_code == 422
+
+
+def test_sla_breach_detection_and_escalation():
+    # Insert an overdue complaint directly in database
+    db.insert_complaint(
+        raw_text="Overdue complaint for SLA testing",
+        category="Roads",
+        subcategory="Pothole",
+        severity="Low",
+        urgency="Routine",
+        location="Ward 1",
+        affected_facility="Street",
+        summary="SLA Breach Test",
+        status="New",
+        sla_deadline="2020-01-01T00:00:00.000000+00:00",  # Far past deadline
+    )
+    breaches = db.process_sla_breaches()
+    assert breaches >= 1
+
 
 
 

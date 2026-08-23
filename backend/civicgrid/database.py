@@ -406,6 +406,7 @@ def list_complaints(
     limit: int = 100,
 ) -> tuple[list[dict[str, Any]], int]:
     """Return (complaints, total_count) applying filters, sort, and pagination."""
+    process_sla_breaches()
     conditions: list[str] = []
     params: list[Any] = []
     is_pg = _is_postgres()
@@ -482,10 +483,37 @@ def list_complaints(
                 conn.close()
 
 
+ALLOWED_TRANSITIONS: dict[str, set[str]] = {
+    "New": {"Under Review", "Assigned", "Rejected / Spam"},
+    "Under Review": {"Assigned", "In Progress", "Rejected / Spam"},
+    "Assigned": {"In Progress", "Resolved", "Rejected / Spam"},
+    "In Progress": {"Resolved", "Rejected / Spam"},
+    "Resolved": {"Verified", "Reopened"},
+    "Reopened": {"In Progress", "Assigned"},
+    "Rejected / Spam": set(),
+}
+
+
 def update_complaint_status(complaint_id: str, new_status: str, actor: str = "Officer") -> dict[str, Any] | None:
-    """Update complaint status. Returns updated record, or None if not found."""
+    """Update complaint status with strict state machine validation. Returns updated record, or None if not found."""
     if new_status not in VALID_STATUSES:
         raise ValueError(f"Invalid status {new_status!r}. Must be one of: {sorted(VALID_STATUSES)}")
+
+    current_row = get_complaint(complaint_id)
+    if not current_row:
+        return None
+
+    current_status = current_row.get("status", "New")
+    if current_status == new_status:
+        return current_row
+
+    allowed_next = ALLOWED_TRANSITIONS.get(current_status, set())
+    if new_status not in allowed_next:
+        raise ValueError(
+            f"Invalid status transition from {current_status!r} to {new_status!r}. "
+            f"Allowed next states for {current_status!r}: {sorted(allowed_next)}"
+        )
+
     now = datetime.now(timezone.utc).isoformat()
     with _lock:
         if _is_postgres():
@@ -519,13 +547,88 @@ def update_complaint_status(complaint_id: str, new_status: str, actor: str = "Of
             complaint_id=complaint_id,
             event_type="STATUS_CHANGED",
             actor=actor,
-            metadata=json.dumps({"new_status": new_status}),
+            metadata=json.dumps({"old_status": current_status, "new_status": new_status}),
         )
     return res
 
 
+def process_sla_breaches() -> int:
+    """
+    Check all open complaints for SLA deadline breaches.
+    If sla_deadline < now and complaint is open, log SLA_BREACHED event
+    and escalate severity to Critical / Emergency if not already logged.
+    Returns count of newly flagged breaches.
+    """
+    now_iso = datetime.now(timezone.utc).isoformat()
+    breached_count = 0
+
+    with _lock:
+        if _is_postgres():
+            with _get_pg_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT id, severity, urgency, sla_deadline FROM complaints
+                        WHERE status IN ('New', 'Under Review', 'Assigned', 'In Progress', 'Reopened')
+                          AND sla_deadline IS NOT NULL
+                          AND sla_deadline < %s
+                        """,
+                        (now_iso,),
+                    )
+                    overdue = [dict(r) for r in cur.fetchall()]
+        else:
+            conn = _get_sqlite_conn()
+            try:
+                rows = conn.execute(
+                    """
+                    SELECT id, severity, urgency, sla_deadline FROM complaints
+                    WHERE status IN ('New', 'Under Review', 'Assigned', 'In Progress', 'Reopened')
+                      AND sla_deadline IS NOT NULL
+                      AND sla_deadline < ?
+                    """,
+                    (now_iso,),
+                ).fetchall()
+                overdue = [dict(r) for r in rows]
+            finally:
+                conn.close()
+
+    for item in overdue:
+        cid = item["id"]
+        events = get_complaint_events(cid)
+        if not any(e.get("event_type") == "SLA_BREACHED" for e in events):
+            breached_count += 1
+            log_complaint_event(
+                complaint_id=cid,
+                event_type="SLA_BREACHED",
+                actor="SLA Monitor",
+                metadata=json.dumps({"sla_deadline": item.get("sla_deadline"), "action": "Escalated to Critical/Emergency"}),
+            )
+            with _lock:
+                if _is_postgres():
+                    with _get_pg_conn() as conn:
+                        with conn.cursor() as cur:
+                            cur.execute(
+                                "UPDATE complaints SET severity = 'Critical', urgency = 'Emergency', updated_at = %s WHERE id = %s",
+                                (now_iso, cid),
+                            )
+                        conn.commit()
+                else:
+                    conn = _get_sqlite_conn()
+                    try:
+                        conn.execute(
+                            "UPDATE complaints SET severity = 'Critical', urgency = 'Emergency', updated_at = ? WHERE id = ?",
+                            (now_iso, cid),
+                        )
+                        conn.commit()
+                    finally:
+                        conn.close()
+
+    return breached_count
+
+
 def get_stats() -> dict[str, Any]:
     """Return aggregate statistics across all primary non-rejected complaints."""
+    process_sla_breaches()
     stat_filter = "WHERE (is_duplicate = 0 OR is_duplicate IS NULL) AND duplicate_of_id IS NULL AND status != 'Rejected / Spam' AND category != 'Spam / Invalid'"
     with _lock:
         if _is_postgres():
@@ -1131,6 +1234,13 @@ def verify_resolution(
     row = get_complaint(complaint_id)
     if not row:
         return None
+
+    if row.get("status") != "Resolved":
+        raise ValueError(f"Citizen verification is only allowed when complaint is in 'Resolved' status. Current status: {row.get('status')!r}")
+
+    existing_verif = get_verification(complaint_id)
+    if existing_verif and existing_verif.get("result") == "Verified":
+        raise ValueError("Citizen resolution verification has already been completed for this complaint.")
 
     new_status = "Resolved" if result == "Verified" else "In Progress"
 

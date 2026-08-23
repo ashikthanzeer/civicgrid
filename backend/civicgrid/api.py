@@ -515,11 +515,14 @@ def resolve_complaint_endpoint(complaint_id: str, req: ResolveComplaintIn) -> Co
     tags=["lifecycle"],
 )
 def verify_complaint_endpoint(complaint_id: str, req: VerifyComplaintIn) -> ComplaintOut:
-    row = db.verify_resolution(
-        complaint_id=complaint_id,
-        result=req.result,
-        feedback=req.feedback,
-    )
+    try:
+        row = db.verify_resolution(
+            complaint_id=complaint_id,
+            result=req.result,
+            feedback=req.feedback,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     if not row:
         raise HTTPException(status_code=404, detail=f"Complaint '{complaint_id}' not found.")
     return _clean_complaint(row)

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 # Match the frontend ComplaintStatus type
 ComplaintStatusLiteral = Literal["New", "Under Review", "Assigned", "In Progress", "Resolved", "Rejected / Spam"]
@@ -61,6 +61,28 @@ class AssignComplaintIn(BaseModel):
 class ResolveComplaintIn(BaseModel):
     note: str = Field(min_length=5, max_length=1000, description="Proof of work resolution note")
     evidence_image: str | None = Field(default=None, description="Optional photo URL or base64 proof of completion")
+
+    @field_validator("evidence_image")
+    @classmethod
+    def validate_evidence_image(cls, v: str | None) -> str | None:
+        if v is None or not v.strip():
+            return None
+        val = v.strip()
+        if val.startswith("data:"):
+            allowed_prefixes = (
+                "data:image/jpeg;base64,",
+                "data:image/jpg;base64,",
+                "data:image/png;base64,",
+                "data:image/webp;base64,",
+                "data:image/gif;base64,",
+            )
+            if not any(val.lower().startswith(p) for p in allowed_prefixes):
+                raise ValueError("Invalid evidence image format. Must be JPEG, PNG, WEBP, or GIF image.")
+            if len(val) > 7_000_000:  # ~5MB base64 limit
+                raise ValueError("Evidence image payload exceeds maximum allowed size of 5MB.")
+        elif not (val.startswith("http://") or val.startswith("https://")):
+            raise ValueError("Evidence image must be a valid HTTP(S) URL or base64 data URI.")
+        return val
 
 
 class VerifyComplaintIn(BaseModel):
