@@ -322,6 +322,9 @@ def list_complaints(
         like = f"%{search}%"
         params.extend([like, like, like])
 
+    # Exclude standalone duplicate entries so only primary unique complaints are listed
+    conditions.append("(is_duplicate = 0 OR is_duplicate IS NULL) AND duplicate_of_id IS NULL")
+
     where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
 
     _ORDER = {
@@ -404,19 +407,20 @@ def update_complaint_status(complaint_id: str, new_status: str) -> dict[str, Any
 
 
 def get_stats() -> dict[str, Any]:
-    """Return aggregate statistics across all complaints."""
+    """Return aggregate statistics across all primary unique complaints."""
+    stat_filter = "WHERE (is_duplicate = 0 OR is_duplicate IS NULL) AND duplicate_of_id IS NULL"
     with _lock:
         if _is_postgres():
             with _get_pg_conn() as conn:
                 with conn.cursor() as cur:
-                    cur.execute("SELECT COUNT(*) FROM complaints")
+                    cur.execute(f"SELECT COUNT(*) FROM complaints {stat_filter}")
                     total_row = cur.fetchone()
                     total = list(total_row.values())[0] if isinstance(total_row, dict) else total_row[0]
 
                     def _group_pg(col: str) -> dict[str, int]:
                         if col not in _ALLOWED_STATS_COLS:
                             raise ValueError(f"Invalid column: {col!r}")
-                        cur.execute(f"SELECT {col}, COUNT(*) FROM complaints GROUP BY {col}")
+                        cur.execute(f"SELECT {col}, COUNT(*) FROM complaints {stat_filter} GROUP BY {col}")
                         rows = cur.fetchall()
                         res = {}
                         for r in rows:
@@ -433,7 +437,7 @@ def get_stats() -> dict[str, Any]:
         else:
             conn = _get_sqlite_conn()
             try:
-                total = conn.execute("SELECT COUNT(*) FROM complaints").fetchone()[0]
+                total = conn.execute(f"SELECT COUNT(*) FROM complaints {stat_filter}").fetchone()[0]
 
                 def _group_sqlite(col: str) -> dict[str, int]:
                     if col not in _ALLOWED_STATS_COLS:
@@ -441,7 +445,7 @@ def get_stats() -> dict[str, Any]:
                     return {
                         row[0]: row[1]
                         for row in conn.execute(
-                            f"SELECT {col}, COUNT(*) FROM complaints GROUP BY {col}"
+                            f"SELECT {col}, COUNT(*) FROM complaints {stat_filter} GROUP BY {col}"
                         ).fetchall()
                     }
 
@@ -519,28 +523,139 @@ def update_officer_password(officer_id: str, old_password: str, new_password: st
                 conn.close()
 
 
-def find_open_complaints_by_location_category(location: str, category: str) -> list[dict[str, Any]]:
-    """Fetch open, non-rejected complaints matching location and category for duplicate check."""
-    loc_clean = (location or "").strip().lower()
+import re
+from math import radians, sin, cos, sqrt, atan2
+
+
+def haversine_distance_meters(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    """Calculate distance in meters between two lat/lng coordinates."""
+    R = 6371000.0  # Earth radius in meters
+    phi1, phi2 = radians(lat1), radians(lat2)
+    dphi = radians(lat2 - lat1)
+    dlambda = radians(lng2 - lng1)
+    a = sin(dphi / 2.0) ** 2 + cos(phi1) * cos(phi2) * sin(dlambda / 2.0) ** 2
+    return R * 2 * atan2(sqrt(a), sqrt(1 - a))
+
+
+def is_same_location(
+    loc1: str,
+    loc2: str,
+    lat1: float | None = None,
+    lng1: float | None = None,
+    lat2: float | None = None,
+    lng2: float | None = None,
+) -> bool:
+    """
+    Returns True if two locations represent the same civic location:
+    1. Coordinates within 500 meters.
+    2. Shared 6-digit Pincode + landmark/area token overlap.
+    3. Case-insensitive landmark substring match or >40% token overlap.
+    """
+    if not loc1 or not loc2:
+        return False
+
+    # 1. GPS Proximity Check (< 500 meters)
+    if lat1 is not None and lng1 is not None and lat2 is not None and lng2 is not None:
+        try:
+            dist = haversine_distance_meters(float(lat1), float(lng1), float(lat2), float(lng2))
+            if dist <= 500.0:  # Within 500 meters
+                return True
+        except (ValueError, TypeError):
+            pass
+
+    # Clean & normalize strings
+    s1 = loc1.strip().lower()
+    s2 = loc2.strip().lower()
+
+    if s1 == s2:
+        return True
+
+    # 2. Extract 6-digit PIN codes
+    pincodes1 = set(re.findall(r"\b[1-9]\d{5}\b", s1))
+    pincodes2 = set(re.findall(r"\b[1-9]\d{5}\b", s2))
+
+    common_pincodes = pincodes1.intersection(pincodes2)
+
+    # Clean punctuation and tokenize
+    tokens1 = set(re.findall(r"\b[a-z0-9]+\b", s1))
+    tokens2 = set(re.findall(r"\b[a-z0-9]+\b", s2))
+
+    # Stop words to ignore when comparing token overlap
+    stop_words = {
+        "near", "opp", "opposite", "behind", "next", "beside", "to", "at", "in", "and", "the", "of",
+        "india", "karnataka", "maharashtra", "delhi", "rajasthan", "tamil", "nadu", "kerala",
+        "ward", "block", "sector", "phase", "street", "st", "road", "rd", "lane", "area", "colony",
+        "nagar", "city", "town", "district", "main", "no", "number"
+    }
+    meaningful1 = tokens1 - stop_words
+    meaningful2 = tokens2 - stop_words
+
+    # If pincode matches, check if any area/landmark token matches
+    if common_pincodes:
+        overlap = (meaningful1 - pincodes1).intersection(meaningful2 - pincodes2)
+        if len(overlap) >= 1 or len(meaningful1 - pincodes1) == 0 or len(meaningful2 - pincodes2) == 0:
+            return True
+
+    # 3. Substring matching & token overlap
+    s1_nopincode = re.sub(r"\b[1-9]\d{5}\b", "", s1).strip(", ")
+    s2_nopincode = re.sub(r"\b[1-9]\d{5}\b", "", s2).strip(", ")
+
+    if len(s1_nopincode) >= 6 and len(s2_nopincode) >= 6:
+        if s1_nopincode in s2_nopincode or s2_nopincode in s1_nopincode:
+            return True
+
+    # Token Overlap >= 50% of the smaller token set
+    overlap = meaningful1.intersection(meaningful2)
+    min_len = min(len(meaningful1), len(meaningful2))
+    if min_len > 0 and len(overlap) / min_len >= 0.5:
+        return True
+
+    return False
+
+
+def find_matching_duplicate_complaint(
+    location: str,
+    category: str,
+    latitude: float | None = None,
+    longitude: float | None = None,
+) -> dict[str, Any] | None:
+    """Search open complaints in category and return the first matching duplicate by landmark/pincode/GPS."""
     with _lock:
         if _is_postgres():
             with _get_pg_conn() as conn:
                 with conn.cursor() as cur:
                     cur.execute(
-                        "SELECT id, summary, raw_text, location, subcategory FROM complaints WHERE LOWER(location) = %s AND category = %s AND status != 'Rejected / Spam' AND status != 'Resolved' ORDER BY created_at DESC LIMIT 10",
-                        (loc_clean, category),
+                        "SELECT id, summary, raw_text, location, subcategory, latitude, longitude FROM complaints WHERE category = %s AND status != 'Rejected / Spam' AND status != 'Resolved' ORDER BY created_at DESC LIMIT 50",
+                        (category,),
                     )
-                    return [dict(r) for r in cur.fetchall()]
+                    candidates = [dict(r) for r in cur.fetchall()]
         else:
             conn = _get_sqlite_conn()
             try:
                 rows = conn.execute(
-                    "SELECT id, summary, raw_text, location, subcategory FROM complaints WHERE LOWER(location) = ? AND category = ? AND status != 'Rejected / Spam' AND status != 'Resolved' ORDER BY created_at DESC LIMIT 10",
-                    (loc_clean, category),
+                    "SELECT id, summary, raw_text, location, subcategory, latitude, longitude FROM complaints WHERE category = ? AND status != 'Rejected / Spam' AND status != 'Resolved' ORDER BY created_at DESC LIMIT 50",
+                    (category,),
                 ).fetchall()
-                return [dict(r) for r in rows]
+                candidates = [dict(r) for r in rows]
             finally:
                 conn.close()
+
+    for cand in candidates:
+        cand_loc = cand.get("location") or ""
+        cand_lat = cand.get("latitude")
+        cand_lng = cand.get("longitude")
+
+        if is_same_location(
+            loc1=location,
+            loc2=cand_loc,
+            lat1=latitude,
+            lng1=longitude,
+            lat2=cand_lat,
+            lng2=cand_lng,
+        ):
+            return cand
+
+    return None
 
 
 def delete_complaint(complaint_id: str) -> bool:

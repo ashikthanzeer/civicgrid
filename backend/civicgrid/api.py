@@ -119,18 +119,22 @@ def submit_complaint(req: SubmitComplaintIn) -> SubmitComplaintResponse:
     is_spam = classification.is_spam or classification.category.value == "Spam / Invalid"
     status = "Rejected / Spam" if is_spam else "New"
 
-    # Check for duplicate open complaints at the same location & category
+    # Check for duplicate open complaints at the same landmark / pincode / location & category
     is_duplicate = False
     duplicate_of_id = None
     if not is_spam and location not in ("", "Unknown"):
-        candidates = db.find_open_complaints_by_location_category(location, classification.category.value)
-        for cand in candidates:
-            cand_sub = (cand.get("subcategory") or "").lower()
+        matching_cand = db.find_matching_duplicate_complaint(
+            location=location,
+            category=classification.category.value,
+            latitude=req.latitude,
+            longitude=req.longitude,
+        )
+        if matching_cand:
+            cand_sub = (matching_cand.get("subcategory") or "").lower()
             new_sub = (classification.subcategory or "").lower()
             if new_sub in cand_sub or cand_sub in new_sub or classification.category.value != "Other":
                 is_duplicate = True
-                duplicate_of_id = cand["id"]
-                break
+                duplicate_of_id = matching_cand["id"]
 
     # If duplicate, MERGE into the original complaint and escalate support count & priority
     if is_duplicate and duplicate_of_id:

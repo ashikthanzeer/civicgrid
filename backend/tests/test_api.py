@@ -190,3 +190,17 @@ def test_duplicate_complaint_merges_and_escalates_priority():
     assert body2["duplicate_of_id"] == orig_id
     assert body2["citizen_reports_count"] == 2
 
+
+def test_fuzzy_landmark_pincode_duplicate_matching():
+    r1 = client.post("/api/complaints", json={"text": "Garbage dumping near the main market complex.", "location": "MG Road, Indiranagar, Jaipur 302006"})
+    assert r1.status_code == 201
+    orig_id = r1.json()["complaint"]["id"]
+
+    r2 = client.post("/api/complaints", json={"text": "Overflowing trash bin near MG Road market area.", "location": "Near MG Road, 302006"})
+    assert r2.status_code == 201
+    body2 = r2.json()["complaint"]
+    assert body2["is_duplicate"] is True
+    assert body2["duplicate_of_id"] == orig_id
+    assert body2["citizen_reports_count"] == 2
+
+
