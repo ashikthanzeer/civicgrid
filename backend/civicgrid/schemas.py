@@ -42,7 +42,7 @@ class CivicComplaint(BaseModel):
     location: str
     affected_facility: str
     summary: str
-    image_analysis: str
+    image_analysis: str = ""
     is_spam: bool = False
     is_duplicate: bool = False
     duplicate_of_id: str | None = None

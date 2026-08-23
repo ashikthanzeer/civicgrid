@@ -25,8 +25,8 @@ VALID_COMPLAINT = {
 }
 
 
-def test_schema_has_exactly_seven_fields():
-    assert set(CivicComplaint.model_fields) == {
+def test_schema_has_required_fields():
+    assert {
         "category",
         "subcategory",
         "severity",
@@ -34,7 +34,11 @@ def test_schema_has_exactly_seven_fields():
         "location",
         "affected_facility",
         "summary",
-    }
+        "image_analysis",
+        "is_spam",
+        "is_duplicate",
+        "duplicate_of_id",
+    } == set(CivicComplaint.model_fields)
 
 
 def test_schema_accepts_valid_values():

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { apiClient } from '../api/client';
 
 export type UserRole = 'citizen' | 'officer';
 
@@ -46,13 +47,14 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // 1. Try real backend endpoint if API active
     try {
-      const res = await fetch('/api/officer/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ officer_id: formattedId, password }),
-      });
-      if (res.ok) {
-        const data = await res.json();
+      const data = await apiClient<{ officer_id: string; name: string; department: string; token: string }>(
+        '/api/officer/login',
+        {
+          method: 'POST',
+          body: JSON.stringify({ officer_id: formattedId, password }),
+        }
+      );
+      if (data && data.officer_id) {
         const profile: OfficerProfile = {
           officer_id: data.officer_id,
           name: data.name,
@@ -109,9 +111,8 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Also call backend if active
     try {
-      await fetch('/api/officer/change-password', {
+      await apiClient('/api/officer/change-password', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           officer_id: officerId,
           old_password: oldPassword,
