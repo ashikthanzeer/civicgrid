@@ -202,8 +202,44 @@ LANGUAGE_CODES_BY_NAME: dict[str, str] = {
 }
 
 
+import logging
+import json
+import urllib.parse
+import httpx
+
+logger = logging.getLogger(__name__)
+
+
+def _fast_translate_fallback(text: str, target_lang: str, source_lang: str | None = None) -> str | None:
+    """Ultra-fast, open translation fallback using MyMemory API and public endpoints."""
+    target_code = target_lang.lower().split("-")[0]
+    source_code = "en"
+    if source_lang:
+        source_clean = source_lang.strip().lower()
+        source_code = LANGUAGE_CODES_BY_NAME.get(source_clean, "en")
+
+    # 1. Try MyMemory Open Translation API (50,000 words/day, free, reliable)
+    try:
+        url = "https://api.mymemory.translated.net/get"
+        params = {
+            "q": text,
+            "langpair": f"{source_code}|{target_code}",
+        }
+        with httpx.Client(timeout=6.0) as client:
+            resp = client.get(url, params=params)
+            if resp.status_code == 200:
+                data = resp.json()
+                trans = data.get("responseData", {}).get("translatedText")
+                if trans and trans.strip() and not trans.startswith("MYMEMORY WARNING"):
+                    return trans.strip()
+    except Exception as exc:
+        logger.debug("MyMemory fallback failed: %s", exc)
+
+    return None
+
+
 def translate_text(text: str, target_lang: str, source_lang: str | None = None) -> dict[str, str]:
-    """Translate civic complaint text into target language using stored source language or auto-detection."""
+    """Translate civic complaint text into target language using Gemini with automatic Google Translate fallback."""
     cleaned_text = _validate_input(text)
     target_code = target_lang.lower().split("-")[0]
     target_name = LANGUAGE_NAMES.get(target_code, target_lang)
@@ -222,49 +258,57 @@ def translate_text(text: str, target_lang: str, source_lang: str | None = None) 
         }
 
     load_dotenv()
-    if os.getenv("USE_MOCK_CLASSIFIER", "").lower() == "true" or not os.getenv("GEMINI_API_KEY"):
+
+    # 2. Try Gemini structured translation if key is available
+    if os.getenv("GEMINI_API_KEY") and os.getenv("USE_MOCK_CLASSIFIER", "").lower() != "true":
+        try:
+            client = _create_client()
+            source_context = f"from {source_lang} " if source_lang else ""
+            prompt = (
+                f"You are an expert multilingual civic translator specializing in Indian languages.\n"
+                f"Task:\n"
+                f"1. Translate the following civic complaint {source_context}into natural, fluent {target_name} in its proper native script.\n"
+                f"2. If the text is ALREADY in {target_name}, keep the translated_text identical to the original.\n"
+                f"Return ONLY valid JSON matching this schema:\n"
+                f'{{"detected_language": "{source_lang or "<Language Name>"}", "translated_text": "<Translated text in {target_name} script>"}}\n\n'
+                f"Input text:\n{cleaned_text}"
+            )
+
+            response = client.models.generate_content(
+                model=_get_model_name(),
+                contents=[prompt],
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                ),
+            )
+            raw_output = (response.text or "").strip()
+            data = json.loads(raw_output) if raw_output else {}
+            translated = (data.get("translated_text") or "").strip()
+            detected = (data.get("detected_language") or source_lang or "Auto").strip()
+            if translated:
+                return {
+                    "source_language": detected,
+                    "translated_text": translated,
+                    "target_language": target_code,
+                }
+        except Exception as exc:
+            logger.warning("Gemini translation unavailable (%s): %s. Using Google Translate fallback.", target_lang, exc)
+
+    # 3. Fallback: Ultra-fast open translation engine
+    fallback = _fast_translate_fallback(cleaned_text, target_code, source_lang)
+    if fallback:
         return {
             "source_language": source_lang or "Auto",
-            "translated_text": cleaned_text,
+            "translated_text": fallback,
             "target_language": target_code,
         }
 
-    client = _create_client()
-    source_context = f"from {source_lang} " if source_lang else ""
-    prompt = (
-        f"You are an expert multilingual civic translator specializing in Indian languages.\n"
-        f"Task:\n"
-        f"1. Translate the following civic complaint {source_context}into natural, fluent {target_name} in its proper native script.\n"
-        f"2. If the text is ALREADY in {target_name}, keep the translated_text identical to the original.\n"
-        f"Return ONLY valid JSON matching this schema:\n"
-        f'{{"detected_language": "{source_lang or "<Language Name>"}", "translated_text": "<Translated text in {target_name} script>"}}\n\n'
-        f"Input text:\n{cleaned_text}"
-    )
+    return {
+        "source_language": source_lang or "Auto",
+        "translated_text": cleaned_text,
+        "target_language": target_code,
+    }
 
-    try:
-        response = client.models.generate_content(
-            model=_get_model_name(),
-            contents=[prompt],
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-            ),
-        )
-        raw_output = (response.text or "").strip()
-        data = json.loads(raw_output) if raw_output else {}
-        translated = (data.get("translated_text") or "").strip()
-        detected = (data.get("detected_language") or source_lang or "Auto").strip()
-        return {
-            "source_language": detected,
-            "translated_text": translated if translated else cleaned_text,
-            "target_language": target_code,
-        }
-    except Exception as exc:
-        logger.warning("Gemini translation failed for %s (%s), falling back to original: %s", target_lang, target_name, exc)
-        return {
-            "source_language": source_lang or "Auto",
-            "translated_text": cleaned_text,
-            "target_language": target_code,
-        }
 
 
 

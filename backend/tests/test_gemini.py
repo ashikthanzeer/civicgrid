@@ -49,6 +49,18 @@ def test_translate_text_fast_path_same_language():
     assert result["target_language"] == "ml"
 
 
+def test_translate_text_cross_language():
+    from civicgrid.gemini import translate_text, _fast_translate_fallback
+    res_fb = _fast_translate_fallback("There is a large pothole on the road near the school", "ml", "English")
+    assert res_fb is not None
+    assert len(res_fb) > 0
+    result = translate_text("There is a large pothole on the road near the school", "ml", source_lang="English")
+    assert result["target_language"] == "ml"
+    assert len(result["translated_text"]) > 0
+
+
+
+
 
 def test_schema_accepts_valid_values():
     complaint = CivicComplaint.model_validate(VALID_COMPLAINT)
