@@ -44,27 +44,31 @@ app = FastAPI(
 
 import os
 
-# Configurable CORS origins with public API defaults (* or specific domains)
+# Robust CORS middleware configuration supporting Vercel and Render deployments
 _cors_env = os.getenv("CORS_ORIGINS", "").strip()
-if _cors_env and _cors_env != "*":
-    _allowed_origins = [o.strip() for o in _cors_env.split(",") if o.strip()]
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=_allowed_origins,
-        allow_origin_regex=r"https://.*\.vercel\.app|https://.*\.onrender\.com|http://localhost:\d+",
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-else:
-    # Default: allow all origins for public civic reporting & Vercel deployments
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=False,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+_allowed_origins = [o.strip() for o in _cors_env.split(",") if o.strip()] if _cors_env and _cors_env != "*" else ["*"]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_allowed_origins,
+    allow_origin_regex=r"https://.*\.vercel\.app|https://.*\.onrender\.com|http://localhost:\d+",
+    allow_credentials=True if _allowed_origins != ["*"] else False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.middleware("http")
+async def ensure_cors_headers(request, call_next):
+    """Ensure CORS headers are always present even on 5xx error responses."""
+    origin = request.headers.get("origin")
+    response = await call_next(request)
+    if origin and "access-control-allow-origin" not in response.headers:
+        response.headers["access-control-allow-origin"] = origin
+        response.headers["access-control-allow-credentials"] = "true"
+        response.headers["access-control-allow-methods"] = "*"
+        response.headers["access-control-allow-headers"] = "*"
+    return response
 
 
 @app.options("/{full_path:path}", include_in_schema=False)
