@@ -15,7 +15,7 @@ from typing import Any
 _DB_PATH_DEFAULT = os.path.join(os.path.dirname(__file__), "..", "data", "civicgrid.db")
 DB_PATH = os.environ.get("CIVICGRID_DB_PATH", _DB_PATH_DEFAULT)
 
-_lock = threading.Lock()
+_lock = threading.RLock()
 
 _CREATE_TABLE_SQL = """
 CREATE TABLE IF NOT EXISTS complaints (
@@ -521,21 +521,22 @@ def update_officer_password(officer_id: str, old_password: str, new_password: st
 
 def find_open_complaints_by_location_category(location: str, category: str) -> list[dict[str, Any]]:
     """Fetch open, non-rejected complaints matching location and category for duplicate check."""
+    loc_clean = (location or "").strip().lower()
     with _lock:
         if _is_postgres():
             with _get_pg_conn() as conn:
                 with conn.cursor() as cur:
                     cur.execute(
-                        "SELECT id, summary, raw_text, location, subcategory FROM complaints WHERE category = %s AND status != 'Rejected / Spam' AND status != 'Resolved' ORDER BY created_at DESC LIMIT 10",
-                        (category,),
+                        "SELECT id, summary, raw_text, location, subcategory FROM complaints WHERE LOWER(location) = %s AND category = %s AND status != 'Rejected / Spam' AND status != 'Resolved' ORDER BY created_at DESC LIMIT 10",
+                        (loc_clean, category),
                     )
                     return [dict(r) for r in cur.fetchall()]
         else:
             conn = _get_sqlite_conn()
             try:
                 rows = conn.execute(
-                    "SELECT id, summary, raw_text, location, subcategory FROM complaints WHERE category = ? AND status != 'Rejected / Spam' AND status != 'Resolved' ORDER BY created_at DESC LIMIT 10",
-                    (category,),
+                    "SELECT id, summary, raw_text, location, subcategory FROM complaints WHERE LOWER(location) = ? AND category = ? AND status != 'Rejected / Spam' AND status != 'Resolved' ORDER BY created_at DESC LIMIT 10",
+                    (loc_clean, category),
                 ).fetchall()
                 return [dict(r) for r in rows]
             finally:
@@ -562,8 +563,50 @@ def delete_complaint(complaint_id: str) -> bool:
                 conn.close()
 
 
-def merge_duplicate_into_original(original_id: str, new_text: str, image_url: str | None = None) -> dict[str, Any] | None:
-    """Increment citizen_reports_count and append text/photo to additional_updates array on original complaint."""
+SEVERITY_ORDER = {"Low": 1, "Medium": 2, "High": 3, "Critical": 4}
+URGENCY_ORDER = {"Routine": 1, "Soon": 2, "Urgent": 3, "Emergency": 4}
+REV_SEVERITY = {1: "Low", 2: "Medium", 3: "High", 4: "Critical"}
+REV_URGENCY = {1: "Routine", 2: "Soon", 3: "Urgent", 4: "Emergency"}
+
+
+def calculate_escalated_priority(
+    current_severity: str,
+    current_urgency: str,
+    new_severity: str | None,
+    new_urgency: str | None,
+    new_count: int,
+) -> tuple[str, str]:
+    """Escalate severity and urgency based on citizen report threshold & incoming complaint level."""
+    sev_rank = SEVERITY_ORDER.get(current_severity, 2)
+    urg_rank = URGENCY_ORDER.get(current_urgency, 1)
+
+    if new_severity:
+        sev_rank = max(sev_rank, SEVERITY_ORDER.get(new_severity, 2))
+    if new_urgency:
+        urg_rank = max(urg_rank, URGENCY_ORDER.get(new_urgency, 1))
+
+    # Support count based automatic escalation thresholds
+    if new_count >= 5:
+        sev_rank = max(sev_rank, 4)  # Critical
+        urg_rank = max(urg_rank, 4)  # Emergency
+    elif new_count >= 3:
+        sev_rank = max(sev_rank, 3)  # High
+        urg_rank = max(urg_rank, 3)  # Urgent
+    elif new_count >= 2:
+        sev_rank = max(sev_rank, 2)  # Medium
+        urg_rank = max(urg_rank, 2)  # Soon
+
+    return REV_SEVERITY.get(sev_rank, "High"), REV_URGENCY.get(urg_rank, "Urgent")
+
+
+def merge_duplicate_into_original(
+    original_id: str,
+    new_text: str,
+    image_url: str | None = None,
+    new_severity: str | None = None,
+    new_urgency: str | None = None,
+) -> dict[str, Any] | None:
+    """Increment citizen_reports_count, escalate severity/urgency, and append text/photo to additional_updates array on original complaint."""
     now = datetime.now(timezone.utc).isoformat()
     update_entry = {"text": new_text, "created_at": now, "image_url": image_url}
 
@@ -574,6 +617,13 @@ def merge_duplicate_into_original(original_id: str, new_text: str, image_url: st
 
         existing_count = row.get("citizen_reports_count") or 1
         new_count = existing_count + 1
+
+        curr_sev = row.get("severity") or "Medium"
+        curr_urg = row.get("urgency") or "Routine"
+
+        escalated_sev, escalated_urg = calculate_escalated_priority(
+            curr_sev, curr_urg, new_severity, new_urgency, new_count
+        )
 
         raw_updates = row.get("additional_updates") or "[]"
         try:
@@ -590,12 +640,14 @@ def merge_duplicate_into_original(original_id: str, new_text: str, image_url: st
                         """
                         UPDATE complaints
                         SET citizen_reports_count = %s,
+                            severity = %s,
+                            urgency = %s,
                             additional_updates = %s,
                             updated_at = %s
                         WHERE id = %s
                         RETURNING *
                         """,
-                        (new_count, new_updates_json, now, original_id),
+                        (new_count, escalated_sev, escalated_urg, new_updates_json, now, original_id),
                     )
                     updated_row = cur.fetchone()
                 conn.commit()
@@ -607,11 +659,13 @@ def merge_duplicate_into_original(original_id: str, new_text: str, image_url: st
                     """
                     UPDATE complaints
                     SET citizen_reports_count = ?,
+                        severity = ?,
+                        urgency = ?,
                         additional_updates = ?,
                         updated_at = ?
                     WHERE id = ?
                     """,
-                    (new_count, new_updates_json, now, original_id),
+                    (new_count, escalated_sev, escalated_urg, new_updates_json, now, original_id),
                 )
                 conn.commit()
                 updated_row = conn.execute("SELECT * FROM complaints WHERE id = ?", (original_id,)).fetchone()

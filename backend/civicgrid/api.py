@@ -132,12 +132,14 @@ def submit_complaint(req: SubmitComplaintIn) -> SubmitComplaintResponse:
                 duplicate_of_id = cand["id"]
                 break
 
-    # If duplicate, MERGE into the original complaint instead of creating a standalone duplicate
+    # If duplicate, MERGE into the original complaint and escalate support count & priority
     if is_duplicate and duplicate_of_id:
         merged_row = db.merge_duplicate_into_original(
             original_id=duplicate_of_id,
             new_text=req.text,
             image_url=req.image_b64 if req.image_b64 else None,
+            new_severity=classification.severity.value,
+            new_urgency=classification.urgency.value,
         )
         if merged_row:
             cleaned = _clean_complaint(merged_row)

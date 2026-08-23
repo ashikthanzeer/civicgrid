@@ -53,6 +53,11 @@ export const ComplaintCard: React.FC<ComplaintCardProps> = ({ complaint }) => {
       <div className="flex flex-wrap items-center gap-2 mb-3">
         <SeverityBadge severity={complaint.severity} />
         <UrgencyBadge urgency={complaint.urgency} />
+        {(complaint.citizen_reports_count ?? 1) > 1 && (
+          <span className="rounded-md bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20 px-2 py-0.5 text-[11px] font-bold">
+            🔥 {complaint.citizen_reports_count} Reports
+          </span>
+        )}
       </div>
 
       {/* Footer */}

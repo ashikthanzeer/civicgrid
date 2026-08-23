@@ -176,3 +176,17 @@ def test_stats_after_submission():
     body = r.json()
     assert body["total"] == 2
     assert body["by_status"].get("New", 0) == 2
+
+
+def test_duplicate_complaint_merges_and_escalates_priority():
+    r1 = client.post("/api/complaints", json={"text": "Water pipeline burst on main road causing severe flooding.", "location": "Ward 7"})
+    assert r1.status_code == 201
+    orig_id = r1.json()["complaint"]["id"]
+
+    r2 = client.post("/api/complaints", json={"text": "Another report of water pipeline burst flooding Ward 7.", "location": "Ward 7"})
+    assert r2.status_code == 201
+    body2 = r2.json()["complaint"]
+    assert body2["is_duplicate"] is True
+    assert body2["duplicate_of_id"] == orig_id
+    assert body2["citizen_reports_count"] == 2
+
