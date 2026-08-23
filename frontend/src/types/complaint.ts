@@ -40,4 +40,40 @@ export interface Complaint {
   citizen_reports_count?: number;
   additional_updates?: string | Array<{ text: string; created_at: string; image_url?: string }>;
   detected_language?: string;
+  department?: string | null;
+  ward?: string | null;
+  assigned_to?: string | null;
+  sla_deadline?: string | null;
+  resolved_at?: string | null;
+  tracking_token?: string | null;
+}
+
+export interface ComplaintEvent {
+  id: string;
+  complaint_id: string;
+  event_type: string;
+  actor: string;
+  timestamp: string;
+  metadata?: string;
+}
+
+export interface ComplaintResolution {
+  complaint_id: string;
+  note: string;
+  evidence_image?: string | null;
+  submitted_at: string;
+}
+
+export interface CitizenVerification {
+  complaint_id: string;
+  result: "Verified" | "Reopened";
+  feedback?: string | null;
+  timestamp: string;
+}
+
+export interface TrackingData {
+  complaint: Complaint;
+  events: ComplaintEvent[];
+  resolution?: ComplaintResolution | null;
+  verification?: CitizenVerification | null;
 }

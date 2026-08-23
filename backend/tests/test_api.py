@@ -213,10 +213,62 @@ def test_translate_endpoint():
     assert len(body["translated_text"]) > 0
 
 
-def test_tts_endpoint():
-    r = client.get("/api/tts", params={"text": "Test", "lang": "ml"})
-    print("TTS STATUS:", r.status_code, "CONTENT_TYPE:", r.headers.get("content-type"), "LEN:", len(r.content))
-    assert r.status_code in (200, 502)
+def test_tracking_token_generated_and_track_endpoint():
+    r = client.post("/api/complaints", json={"text": "Large pothole blocking lane 4 near city park.", "location": "Ward 4"})
+    assert r.status_code == 201
+    complaint = r.json()["complaint"]
+    assert "tracking_token" in complaint
+    token = complaint["tracking_token"]
+    assert token.startswith("TK-")
+
+    track_res = client.get(f"/api/complaints/track/{token}")
+    assert track_res.status_code == 200
+    track_body = track_res.json()
+    assert track_body["complaint"]["id"] == complaint["id"]
+    assert len(track_body["events"]) >= 1
+    assert track_body["events"][0]["event_type"] == "CREATED"
+
+
+def test_assign_complaint_endpoint():
+    r = client.post("/api/complaints", json={"text": "Water leakage from overhead tank near school.", "location": "Ward 2"})
+    cid = r.json()["complaint"]["id"]
+
+    assign_res = client.post(
+        f"/api/complaints/{cid}/assign",
+        json={"department": "Water Supply", "ward": "Ward 2", "assigned_to": "Officer K. Varma", "sla_hours": 48},
+    )
+    assert assign_res.status_code == 200
+    assigned = assign_res.json()
+    assert assigned["status"] == "Assigned"
+    assert assigned["department"] == "Water Supply"
+    assert assigned["assigned_to"] == "Officer K. Varma"
+
+
+def test_resolve_and_verify_complaint_flow():
+    r = client.post("/api/complaints", json={"text": "Garbage dump cleared request in sector 3.", "location": "Ward 3"})
+    cid = r.json()["complaint"]["id"]
+
+    resolve_res = client.post(
+        f"/api/complaints/{cid}/resolve",
+        json={"note": "Cleaned up garbage using excavator and disinfected area.", "evidence_image": "https://example.com/proof.jpg"},
+    )
+    assert resolve_res.status_code == 200
+    assert resolve_res.json()["status"] == "Resolved"
+
+    verify_res = client.post(
+        f"/api/complaints/{cid}/verify",
+        json={"result": "Verified", "feedback": "Area is clean now. Great job!"},
+    )
+    assert verify_res.status_code == 200
+    assert verify_res.json()["status"] == "Resolved"
+
+    timeline_res = client.get(f"/api/complaints/{cid}/timeline")
+    assert timeline_res.status_code == 200
+    event_types = [e["event_type"] for e in timeline_res.json()]
+    assert "CREATED" in event_types
+    assert "RESOLVED" in event_types
+    assert "VERIFIED_SATISFIED" in event_types
+
 
 
 

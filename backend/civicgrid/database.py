@@ -9,7 +9,8 @@ import os
 import sqlite3
 import threading
 import json
-from datetime import datetime, timezone
+import secrets
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 _DB_PATH_DEFAULT = os.path.join(os.path.dirname(__file__), "..", "data", "civicgrid.db")
@@ -39,7 +40,13 @@ CREATE TABLE IF NOT EXISTS complaints (
     duplicate_of_id   TEXT,
     citizen_reports_count INTEGER DEFAULT 1,
     additional_updates TEXT DEFAULT '[]',
-    detected_language TEXT DEFAULT 'English'
+    detected_language TEXT DEFAULT 'English',
+    department        TEXT,
+    ward              TEXT,
+    assigned_to       TEXT,
+    sla_deadline      TEXT,
+    resolved_at       TEXT,
+    tracking_token    TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_complaints_status   ON complaints(status);
 CREATE INDEX IF NOT EXISTS idx_complaints_category ON complaints(category);
@@ -51,6 +58,30 @@ CREATE TABLE IF NOT EXISTS officers (
     name          TEXT NOT NULL,
     department    TEXT NOT NULL,
     created_at    TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS complaint_events (
+    id            TEXT PRIMARY KEY,
+    complaint_id  TEXT NOT NULL,
+    event_type    TEXT NOT NULL,
+    actor         TEXT NOT NULL,
+    timestamp     TEXT NOT NULL,
+    metadata      TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_complaint_events_cid ON complaint_events(complaint_id);
+
+CREATE TABLE IF NOT EXISTS resolutions (
+    complaint_id   TEXT PRIMARY KEY,
+    note           TEXT NOT NULL,
+    evidence_image TEXT,
+    submitted_at   TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS citizen_verifications (
+    complaint_id TEXT PRIMARY KEY,
+    result       TEXT NOT NULL,
+    feedback     TEXT,
+    timestamp    TEXT NOT NULL
 );
 """
 
@@ -134,6 +165,12 @@ def init_db() -> None:
                     cur.execute("ALTER TABLE complaints ADD COLUMN IF NOT EXISTS citizen_reports_count INTEGER DEFAULT 1;")
                     cur.execute("ALTER TABLE complaints ADD COLUMN IF NOT EXISTS additional_updates TEXT DEFAULT '[]';")
                     cur.execute("ALTER TABLE complaints ADD COLUMN IF NOT EXISTS detected_language TEXT DEFAULT 'English';")
+                    cur.execute("ALTER TABLE complaints ADD COLUMN IF NOT EXISTS department TEXT;")
+                    cur.execute("ALTER TABLE complaints ADD COLUMN IF NOT EXISTS ward TEXT;")
+                    cur.execute("ALTER TABLE complaints ADD COLUMN IF NOT EXISTS assigned_to TEXT;")
+                    cur.execute("ALTER TABLE complaints ADD COLUMN IF NOT EXISTS sla_deadline TEXT;")
+                    cur.execute("ALTER TABLE complaints ADD COLUMN IF NOT EXISTS resolved_at TEXT;")
+                    cur.execute("ALTER TABLE complaints ADD COLUMN IF NOT EXISTS tracking_token TEXT;")
                     _seed_officer(cur, is_pg=True)
                 conn.commit()
         else:
@@ -141,7 +178,14 @@ def init_db() -> None:
             try:
                 conn.executescript(_CREATE_TABLE_SQL)
                 # Migration for existing SQLite DBs
-                for col in ["latitude REAL", "longitude REAL", "image_url TEXT", "image_analysis TEXT", "is_duplicate INTEGER DEFAULT 0", "duplicate_of_id TEXT", "citizen_reports_count INTEGER DEFAULT 1", "additional_updates TEXT DEFAULT '[]'", "detected_language TEXT DEFAULT 'English'"]:
+                cols = [
+                    "latitude REAL", "longitude REAL", "image_url TEXT", "image_analysis TEXT", 
+                    "is_duplicate INTEGER DEFAULT 0", "duplicate_of_id TEXT", "citizen_reports_count INTEGER DEFAULT 1", 
+                    "additional_updates TEXT DEFAULT '[]'", "detected_language TEXT DEFAULT 'English'",
+                    "department TEXT", "ward TEXT", "assigned_to TEXT", 
+                    "sla_deadline TEXT", "resolved_at TEXT", "tracking_token TEXT"
+                ]
+                for col in cols:
                     try:
                         conn.execute(f"ALTER TABLE complaints ADD COLUMN {col}")
                     except sqlite3.OperationalError:
@@ -183,6 +227,19 @@ def _next_id_pg(conn) -> str:
         return f"{prefix}{n:04d}"
 
 
+def generate_tracking_token() -> str:
+    """Generate a unique 12-character public tracking token."""
+    return f"TK-{secrets.token_hex(4).upper()}"
+
+
+def calculate_default_sla(severity: str, from_time: datetime | None = None) -> str:
+    """Calculate target SLA resolution deadline timestamp based on issue severity."""
+    base = from_time or datetime.now(timezone.utc)
+    hours_map = {"Critical": 24, "High": 48, "Medium": 72, "Low": 120}
+    hours = hours_map.get(severity, 72)
+    return (base + timedelta(hours=hours)).isoformat()
+
+
 def insert_complaint(
     *,
     raw_text: str,
@@ -201,10 +258,19 @@ def insert_complaint(
     is_duplicate: bool = False,
     duplicate_of_id: str | None = None,
     detected_language: str = "English",
+    department: str | None = None,
+    ward: str | None = None,
+    assigned_to: str | None = None,
+    sla_deadline: str | None = None,
+    resolved_at: str | None = None,
+    tracking_token: str | None = None,
 ) -> dict[str, Any]:
     """Insert a new complaint and return the full record."""
     now = datetime.now(timezone.utc).isoformat()
     is_dup_int = 1 if is_duplicate else 0
+    token = tracking_token or generate_tracking_token()
+    sla = sla_deadline or calculate_default_sla(severity)
+
     with _lock:
         if _is_postgres():
             with _get_pg_conn() as conn:
@@ -215,8 +281,9 @@ def insert_complaint(
                         INSERT INTO complaints
                           (id, raw_text, category, subcategory, severity, urgency,
                            location, affected_facility, summary, status, created_at, updated_at,
-                           latitude, longitude, image_url, image_analysis, is_duplicate, duplicate_of_id, detected_language)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                           latitude, longitude, image_url, image_analysis, is_duplicate, duplicate_of_id, detected_language,
+                           department, ward, assigned_to, sla_deadline, resolved_at, tracking_token)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         RETURNING *
                         """,
                         (
@@ -239,11 +306,17 @@ def insert_complaint(
                             is_dup_int,
                             duplicate_of_id,
                             detected_language,
+                            department,
+                            ward,
+                            assigned_to,
+                            sla,
+                            resolved_at,
+                            token,
                         ),
                     )
                     row = cur.fetchone()
                 conn.commit()
-                return dict(row)
+                res_dict = dict(row)
         else:
             conn = _get_sqlite_conn()
             try:
@@ -253,8 +326,9 @@ def insert_complaint(
                     INSERT INTO complaints
                       (id, raw_text, category, subcategory, severity, urgency,
                        location, affected_facility, summary, status, created_at, updated_at,
-                       latitude, longitude, image_url, image_analysis, is_duplicate, duplicate_of_id, detected_language)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                       latitude, longitude, image_url, image_analysis, is_duplicate, duplicate_of_id, detected_language,
+                       department, ward, assigned_to, sla_deadline, resolved_at, tracking_token)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         complaint_id,
@@ -276,13 +350,28 @@ def insert_complaint(
                         is_dup_int,
                         duplicate_of_id,
                         detected_language,
+                        department,
+                        ward,
+                        assigned_to,
+                        sla,
+                        resolved_at,
+                        token,
                     ),
                 )
                 conn.commit()
                 row = conn.execute("SELECT * FROM complaints WHERE id = ?", (complaint_id,)).fetchone()
-                return dict(row)
+                res_dict = dict(row)
             finally:
                 conn.close()
+
+    # Log initial creation event
+    log_complaint_event(
+        complaint_id=res_dict["id"],
+        event_type="CREATED",
+        actor="Citizen",
+        metadata=json.dumps({"category": category, "severity": severity, "tracking_token": token}),
+    )
+    return res_dict
 
 
 def get_complaint(complaint_id: str) -> dict[str, Any] | None:
@@ -393,7 +482,7 @@ def list_complaints(
                 conn.close()
 
 
-def update_complaint_status(complaint_id: str, new_status: str) -> dict[str, Any] | None:
+def update_complaint_status(complaint_id: str, new_status: str, actor: str = "Officer") -> dict[str, Any] | None:
     """Update complaint status. Returns updated record, or None if not found."""
     if new_status not in VALID_STATUSES:
         raise ValueError(f"Invalid status {new_status!r}. Must be one of: {sorted(VALID_STATUSES)}")
@@ -408,7 +497,7 @@ def update_complaint_status(complaint_id: str, new_status: str) -> dict[str, Any
                     )
                     row = cur.fetchone()
                 conn.commit()
-                return dict(row) if row else None
+                res = dict(row) if row else None
         else:
             conn = _get_sqlite_conn()
             try:
@@ -418,11 +507,21 @@ def update_complaint_status(complaint_id: str, new_status: str) -> dict[str, Any
                 )
                 conn.commit()
                 if result.rowcount == 0:
-                    return None
-                row = conn.execute("SELECT * FROM complaints WHERE id = ?", (complaint_id,)).fetchone()
-                return dict(row)
+                    res = None
+                else:
+                    row = conn.execute("SELECT * FROM complaints WHERE id = ?", (complaint_id,)).fetchone()
+                    res = dict(row)
             finally:
                 conn.close()
+
+    if res:
+        log_complaint_event(
+            complaint_id=complaint_id,
+            event_type="STATUS_CHANGED",
+            actor=actor,
+            metadata=json.dumps({"new_status": new_status}),
+        )
+    return res
 
 
 def get_stats() -> dict[str, Any]:
@@ -827,3 +926,322 @@ def merge_duplicate_into_original(
                 return dict(updated_row) if updated_row else None
             finally:
                 conn.close()
+
+
+def log_complaint_event(
+    complaint_id: str,
+    event_type: str,
+    actor: str = "System",
+    metadata: str = "",
+) -> dict[str, Any]:
+    """Log an immutable event to the audit trail."""
+    now = datetime.now(timezone.utc).isoformat()
+    event_id = f"EVT-{secrets.token_hex(4).upper()}"
+    with _lock:
+        if _is_postgres():
+            with _get_pg_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        INSERT INTO complaint_events (id, complaint_id, event_type, actor, timestamp, metadata)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                        RETURNING *
+                        """,
+                        (event_id, complaint_id, event_type, actor, now, metadata),
+                    )
+                    row = cur.fetchone()
+                conn.commit()
+                return dict(row)
+        else:
+            conn = _get_sqlite_conn()
+            try:
+                conn.execute(
+                    """
+                    INSERT INTO complaint_events (id, complaint_id, event_type, actor, timestamp, metadata)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (event_id, complaint_id, event_type, actor, now, metadata),
+                )
+                conn.commit()
+                row = conn.execute("SELECT * FROM complaint_events WHERE id = ?", (event_id,)).fetchone()
+                return dict(row)
+            finally:
+                conn.close()
+
+
+def get_complaint_events(complaint_id: str) -> list[dict[str, Any]]:
+    """Retrieve chronological audit trail events for a complaint."""
+    with _lock:
+        if _is_postgres():
+            with _get_pg_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "SELECT * FROM complaint_events WHERE complaint_id = %s ORDER BY timestamp ASC",
+                        (complaint_id,),
+                    )
+                    rows = cur.fetchall()
+                    return [dict(r) for r in rows]
+        else:
+            conn = _get_sqlite_conn()
+            try:
+                rows = conn.execute(
+                    "SELECT * FROM complaint_events WHERE complaint_id = ? ORDER BY timestamp ASC",
+                    (complaint_id,),
+                ).fetchall()
+                return [dict(r) for r in rows]
+            finally:
+                conn.close()
+
+
+def assign_complaint(
+    complaint_id: str,
+    department: str | None = None,
+    ward: str | None = None,
+    assigned_to: str | None = None,
+    sla_hours: int | None = None,
+    actor: str = "Officer",
+) -> dict[str, Any] | None:
+    """Assign complaint to a department, ward, and officer with updated status and optional custom SLA hours."""
+    now = datetime.now(timezone.utc)
+    now_iso = now.isoformat()
+    row = get_complaint(complaint_id)
+    if not row:
+        return None
+
+    new_sla = row.get("sla_deadline")
+    if sla_hours and sla_hours > 0:
+        new_sla = (now + timedelta(hours=sla_hours)).isoformat()
+
+    dep = department or row.get("department")
+    w = ward or row.get("ward")
+    officer = assigned_to or row.get("assigned_to")
+
+    with _lock:
+        if _is_postgres():
+            with _get_pg_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        UPDATE complaints
+                        SET department = %s, ward = %s, assigned_to = %s, sla_deadline = %s, status = 'Assigned', updated_at = %s
+                        WHERE id = %s
+                        RETURNING *
+                        """,
+                        (dep, w, officer, new_sla, now_iso, complaint_id),
+                    )
+                    updated = cur.fetchone()
+                conn.commit()
+                res = dict(updated) if updated else None
+        else:
+            conn = _get_sqlite_conn()
+            try:
+                conn.execute(
+                    """
+                    UPDATE complaints
+                    SET department = ?, ward = ?, assigned_to = ?, sla_deadline = ?, status = 'Assigned', updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (dep, w, officer, new_sla, now_iso, complaint_id),
+                )
+                conn.commit()
+                r = conn.execute("SELECT * FROM complaints WHERE id = ?", (complaint_id,)).fetchone()
+                res = dict(r) if r else None
+            finally:
+                conn.close()
+
+    if res:
+        log_complaint_event(
+            complaint_id=complaint_id,
+            event_type="ASSIGNED",
+            actor=actor,
+            metadata=json.dumps({"department": dep, "ward": w, "assigned_to": officer, "sla_deadline": new_sla}),
+        )
+    return res
+
+
+def submit_resolution(
+    complaint_id: str,
+    note: str,
+    evidence_image: str | None = None,
+    actor: str = "Officer",
+) -> dict[str, Any] | None:
+    """Submit proof of work resolution notes and mark complaint as Resolved."""
+    now = datetime.now(timezone.utc).isoformat()
+    row = get_complaint(complaint_id)
+    if not row:
+        return None
+
+    with _lock:
+        if _is_postgres():
+            with _get_pg_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        INSERT INTO resolutions (complaint_id, note, evidence_image, submitted_at)
+                        VALUES (%s, %s, %s, %s)
+                        ON CONFLICT (complaint_id) DO UPDATE SET note = EXCLUDED.note, evidence_image = EXCLUDED.evidence_image, submitted_at = EXCLUDED.submitted_at
+                        """,
+                        (complaint_id, note, evidence_image, now),
+                    )
+                    cur.execute(
+                        "UPDATE complaints SET status = 'Resolved', resolved_at = %s, updated_at = %s WHERE id = %s RETURNING *",
+                        (now, now, complaint_id),
+                    )
+                    updated = cur.fetchone()
+                conn.commit()
+                res = dict(updated) if updated else None
+        else:
+            conn = _get_sqlite_conn()
+            try:
+                conn.execute(
+                    """
+                    INSERT INTO resolutions (complaint_id, note, evidence_image, submitted_at)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT(complaint_id) DO UPDATE SET note = excluded.note, evidence_image = excluded.evidence_image, submitted_at = excluded.submitted_at
+                    """,
+                    (complaint_id, note, evidence_image, now),
+                )
+                conn.execute(
+                    "UPDATE complaints SET status = 'Resolved', resolved_at = ?, updated_at = ? WHERE id = ?",
+                    (now, now, complaint_id),
+                )
+                conn.commit()
+                r = conn.execute("SELECT * FROM complaints WHERE id = ?", (complaint_id,)).fetchone()
+                res = dict(r) if r else None
+            finally:
+                conn.close()
+
+    if res:
+        log_complaint_event(
+            complaint_id=complaint_id,
+            event_type="RESOLVED",
+            actor=actor,
+            metadata=json.dumps({"note": note, "evidence_image": evidence_image}),
+        )
+    return res
+
+
+def verify_resolution(
+    complaint_id: str,
+    result: str,  # "Verified" or "Reopened"
+    feedback: str | None = None,
+) -> dict[str, Any] | None:
+    """Submit citizen satisfaction verification feedback. If Reopened, status updates back to In Progress."""
+    now = datetime.now(timezone.utc).isoformat()
+    row = get_complaint(complaint_id)
+    if not row:
+        return None
+
+    new_status = "Resolved" if result == "Verified" else "In Progress"
+
+    with _lock:
+        if _is_postgres():
+            with _get_pg_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        INSERT INTO citizen_verifications (complaint_id, result, feedback, timestamp)
+                        VALUES (%s, %s, %s, %s)
+                        ON CONFLICT (complaint_id) DO UPDATE SET result = EXCLUDED.result, feedback = EXCLUDED.feedback, timestamp = EXCLUDED.timestamp
+                        """,
+                        (complaint_id, result, feedback or "", now),
+                    )
+                    cur.execute(
+                        "UPDATE complaints SET status = %s, updated_at = %s WHERE id = %s RETURNING *",
+                        (new_status, now, complaint_id),
+                    )
+                    updated = cur.fetchone()
+                conn.commit()
+                res = dict(updated) if updated else None
+        else:
+            conn = _get_sqlite_conn()
+            try:
+                conn.execute(
+                    """
+                    INSERT INTO citizen_verifications (complaint_id, result, feedback, timestamp)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT(complaint_id) DO UPDATE SET result = excluded.result, feedback = excluded.feedback, timestamp = excluded.timestamp
+                    """,
+                    (complaint_id, result, feedback or "", now),
+                )
+                conn.execute(
+                    "UPDATE complaints SET status = ?, updated_at = ? WHERE id = ?",
+                    (new_status, now, complaint_id),
+                )
+                conn.commit()
+                r = conn.execute("SELECT * FROM complaints WHERE id = ?", (complaint_id,)).fetchone()
+                res = dict(r) if r else None
+            finally:
+                conn.close()
+
+    if res:
+        event_type = "VERIFIED_SATISFIED" if result == "Verified" else "REOPENED_UNSATISFIED"
+        log_complaint_event(
+            complaint_id=complaint_id,
+            event_type=event_type,
+            actor="Citizen",
+            metadata=json.dumps({"result": result, "feedback": feedback}),
+        )
+    return res
+
+
+def get_complaint_by_tracking_token(tracking_token: str) -> dict[str, Any] | None:
+    """Return complaint by secret tracking token or exact ID match."""
+    clean_token = tracking_token.strip()
+    with _lock:
+        if _is_postgres():
+            with _get_pg_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "SELECT * FROM complaints WHERE tracking_token = %s OR id = %s",
+                        (clean_token, clean_token),
+                    )
+                    row = cur.fetchone()
+                    return dict(row) if row else None
+        else:
+            conn = _get_sqlite_conn()
+            try:
+                row = conn.execute(
+                    "SELECT * FROM complaints WHERE tracking_token = ? OR id = ?",
+                    (clean_token, clean_token),
+                ).fetchone()
+                return dict(row) if row else None
+            finally:
+                conn.close()
+
+
+def get_resolution(complaint_id: str) -> dict[str, Any] | None:
+    """Retrieve resolution record for a complaint."""
+    with _lock:
+        if _is_postgres():
+            with _get_pg_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT * FROM resolutions WHERE complaint_id = %s", (complaint_id,))
+                    row = cur.fetchone()
+                    return dict(row) if row else None
+        else:
+            conn = _get_sqlite_conn()
+            try:
+                row = conn.execute("SELECT * FROM resolutions WHERE complaint_id = ?", (complaint_id,)).fetchone()
+                return dict(row) if row else None
+            finally:
+                conn.close()
+
+
+def get_verification(complaint_id: str) -> dict[str, Any] | None:
+    """Retrieve citizen verification record for a complaint."""
+    with _lock:
+        if _is_postgres():
+            with _get_pg_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT * FROM citizen_verifications WHERE complaint_id = %s", (complaint_id,))
+                    row = cur.fetchone()
+                    return dict(row) if row else None
+        else:
+            conn = _get_sqlite_conn()
+            try:
+                row = conn.execute("SELECT * FROM citizen_verifications WHERE complaint_id = ?", (complaint_id,)).fetchone()
+                return dict(row) if row else None
+            finally:
+                conn.close()
+

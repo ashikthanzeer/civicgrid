@@ -26,6 +26,8 @@ const queryClient = new QueryClient({
   },
 });
 
+import { PublicTrackPage } from './pages/PublicTrackPage';
+
 function AppContent() {
   const { isDark } = useTheme();
   const palette = isDark ? darkTokens : lightTokens;
@@ -81,6 +83,8 @@ function AppContent() {
               <Route path="/complaints" element={<ComplaintsPage />} />
               <Route path="/complaints/:id" element={<ComplaintDetailsPage />} />
               <Route path="/submit" element={<SubmitComplaintPage />} />
+              <Route path="/track" element={<PublicTrackPage />} />
+              <Route path="/track/:token" element={<PublicTrackPage />} />
               <Route path="/map" element={<MapPage />} />
               <Route path="/settings" element={<SettingsPage />} />
             </Route>

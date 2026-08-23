@@ -432,6 +432,34 @@ export const ComplaintDetails: React.FC<ComplaintDetailsProps> = ({ complaint: i
                 </div>
               </div>
 
+              {complaint.tracking_token && (
+                <div className="border-t pt-4" style={{ borderColor: 'var(--color-border)' }}>
+                  <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-400">
+                    Public Tracking Token
+                  </p>
+                  <div className="flex items-center justify-between bg-[#0F1229] border border-[#2A2F5C] rounded-lg p-2 text-xs font-mono text-slate-200">
+                    <span>{complaint.tracking_token}</span>
+                    <button
+                      onClick={() => navigate(`/track/${complaint.tracking_token}`)}
+                      className="text-[11px] text-amber-400 hover:underline font-sans"
+                    >
+                      Track Portal ↗
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {complaint.sla_deadline && (
+                <div className="border-t pt-4" style={{ borderColor: 'var(--color-border)' }}>
+                  <p className="mb-1 text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-muted)' }}>
+                    Target SLA Resolution Deadline
+                  </p>
+                  <p className="text-xs font-mono font-medium text-amber-300">
+                    {new Date(complaint.sla_deadline).toLocaleString()}
+                  </p>
+                </div>
+              )}
+
               {complaint.summary && (
                 <div className="border-t pt-4" style={{ borderColor: 'var(--color-border)' }}>
                   <p className="mb-2 text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-muted)' }}>

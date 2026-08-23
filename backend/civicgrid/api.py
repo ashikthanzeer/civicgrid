@@ -24,6 +24,12 @@ from .models import (
     ChangePasswordOut,
     TranslateTextIn,
     TranslateTextOut,
+    AssignComplaintIn,
+    ResolveComplaintIn,
+    VerifyComplaintIn,
+    TimelineEventOut,
+    ResolutionOut,
+    VerificationOut,
 )
 
 logger = logging.getLogger(__name__)
@@ -439,6 +445,95 @@ async def tts_endpoint(text: str = Query(..., max_length=1000), lang: str = Quer
         logger.warning("TTS audio fetch failed for %s: %s", lang, exc)
 
     raise HTTPException(status_code=502, detail="TTS service temporarily unavailable")
+
+
+@app.get(
+    "/api/complaints/track/{tracking_token}",
+    summary="Track complaint by public tracking token or ID",
+    tags=["tracking"],
+)
+def track_complaint(tracking_token: str) -> dict:
+    row = db.get_complaint_by_tracking_token(tracking_token)
+    if not row:
+        raise HTTPException(status_code=404, detail="Invalid or expired tracking token.")
+
+    complaint_id = row["id"]
+    events = db.get_complaint_events(complaint_id)
+    resolution = db.get_resolution(complaint_id)
+    verification = db.get_verification(complaint_id)
+
+    return {
+        "complaint": _clean_complaint(row),
+        "events": events,
+        "resolution": resolution,
+        "verification": verification,
+    }
+
+
+@app.post(
+    "/api/complaints/{complaint_id}/assign",
+    response_model=ComplaintOut,
+    summary="Assign complaint to department, ward, and officer (Officer only)",
+    tags=["lifecycle"],
+)
+def assign_complaint_endpoint(complaint_id: str, req: AssignComplaintIn) -> ComplaintOut:
+    row = db.assign_complaint(
+        complaint_id=complaint_id,
+        department=req.department,
+        ward=req.ward,
+        assigned_to=req.assigned_to,
+        sla_hours=req.sla_hours,
+        actor="Officer",
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail=f"Complaint '{complaint_id}' not found.")
+    return _clean_complaint(row)
+
+
+@app.post(
+    "/api/complaints/{complaint_id}/resolve",
+    response_model=ComplaintOut,
+    summary="Submit resolution proof and mark as Resolved (Officer only)",
+    tags=["lifecycle"],
+)
+def resolve_complaint_endpoint(complaint_id: str, req: ResolveComplaintIn) -> ComplaintOut:
+    row = db.submit_resolution(
+        complaint_id=complaint_id,
+        note=req.note,
+        evidence_image=req.evidence_image,
+        actor="Officer",
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail=f"Complaint '{complaint_id}' not found.")
+    return _clean_complaint(row)
+
+
+@app.post(
+    "/api/complaints/{complaint_id}/verify",
+    response_model=ComplaintOut,
+    summary="Submit citizen verification feedback (Public/Citizen)",
+    tags=["lifecycle"],
+)
+def verify_complaint_endpoint(complaint_id: str, req: VerifyComplaintIn) -> ComplaintOut:
+    row = db.verify_resolution(
+        complaint_id=complaint_id,
+        result=req.result,
+        feedback=req.feedback,
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail=f"Complaint '{complaint_id}' not found.")
+    return _clean_complaint(row)
+
+
+@app.get(
+    "/api/complaints/{complaint_id}/timeline",
+    response_model=list[TimelineEventOut],
+    summary="Get chronological timeline events for a complaint",
+    tags=["lifecycle"],
+)
+def get_complaint_timeline_endpoint(complaint_id: str) -> list[TimelineEventOut]:
+    events = db.get_complaint_events(complaint_id)
+    return [TimelineEventOut(**e) for e in events]
 
 
 @app.get("/api/health", summary="Health check", tags=["system"])

@@ -99,4 +99,42 @@ export const translateComplaintText = async (
   }
 };
 
+export const trackComplaintByToken = async (token: string): Promise<import('../types/complaint').TrackingData> => {
+  return apiClient<import('../types/complaint').TrackingData>(`/api/complaints/track/${encodeURIComponent(token)}`);
+};
+
+export const assignComplaint = async (
+  id: string,
+  data: { department?: string; ward?: string; assigned_to?: string; sla_hours?: number },
+): Promise<Complaint> => {
+  return apiClient<Complaint>(`/api/complaints/${id}/assign`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+export const resolveComplaint = async (
+  id: string,
+  data: { note: string; evidence_image?: string },
+): Promise<Complaint> => {
+  return apiClient<Complaint>(`/api/complaints/${id}/resolve`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+export const verifyComplaint = async (
+  id: string,
+  data: { result: 'Verified' | 'Reopened'; feedback?: string },
+): Promise<Complaint> => {
+  return apiClient<Complaint>(`/api/complaints/${id}/verify`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+export const getComplaintTimeline = async (id: string): Promise<import('../types/complaint').ComplaintEvent[]> => {
+  return apiClient<import('../types/complaint').ComplaintEvent[]>(`/api/complaints/${id}/timeline`);
+};
+
 

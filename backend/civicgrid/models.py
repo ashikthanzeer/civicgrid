@@ -43,6 +43,52 @@ class ComplaintOut(BaseModel):
     citizen_reports_count: int = 1
     additional_updates: str = "[]"
     detected_language: str = "English"
+    department: str | None = None
+    ward: str | None = None
+    assigned_to: str | None = None
+    sla_deadline: str | None = None
+    resolved_at: str | None = None
+    tracking_token: str | None = None
+
+
+class AssignComplaintIn(BaseModel):
+    department: str | None = Field(default=None, description="Department name (e.g. Municipal Public Works)")
+    ward: str | None = Field(default=None, description="Municipal ward or zone")
+    assigned_to: str | None = Field(default=None, description="Assigned officer name or ID")
+    sla_hours: int | None = Field(default=None, ge=1, le=720, description="Optional custom SLA resolution window in hours")
+
+
+class ResolveComplaintIn(BaseModel):
+    note: str = Field(min_length=5, max_length=1000, description="Proof of work resolution note")
+    evidence_image: str | None = Field(default=None, description="Optional photo URL or base64 proof of completion")
+
+
+class VerifyComplaintIn(BaseModel):
+    result: Literal["Verified", "Reopened"] = Field(description="Citizen satisfaction verification result")
+    feedback: str | None = Field(default=None, max_length=500, description="Optional feedback text")
+
+
+class TimelineEventOut(BaseModel):
+    id: str
+    complaint_id: str
+    event_type: str
+    actor: str
+    timestamp: str
+    metadata: str = ""
+
+
+class ResolutionOut(BaseModel):
+    complaint_id: str
+    note: str
+    evidence_image: str | None = None
+    submitted_at: str
+
+
+class VerificationOut(BaseModel):
+    complaint_id: str
+    result: str
+    feedback: str | None = None
+    timestamp: str
 
 
 class SubmitComplaintResponse(BaseModel):
