@@ -209,6 +209,23 @@ def get_stats() -> StatsResponse:
     return StatsResponse(**db.get_stats())
 
 
+from fastapi.responses import PlainTextResponse
+
+@app.get(
+    "/api/reports/policy-brief",
+    response_class=PlainTextResponse,
+    summary="Generate AI policy brief",
+    tags=["reports"],
+)
+def get_policy_brief() -> str:
+    """Generate an AI-driven policy brief from stats and hotspots."""
+    stats = db.get_stats()
+    hotspots = db.get_critical_hotspots(limit=10)
+    
+    from .gemini import generate_policy_brief
+    return generate_policy_brief(stats, hotspots)
+
+
 def _clean_complaint(row: dict) -> ComplaintOut:
     """Safely sanitize database row to prevent Pydantic 422 validation errors."""
     try:

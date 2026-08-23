@@ -478,6 +478,27 @@ def get_stats() -> dict[str, Any]:
                 conn.close()
 
 
+def get_critical_hotspots(limit: int = 10) -> list[dict[str, Any]]:
+    """Return the most critical, open complaints sorted by urgency, severity, and report count."""
+    stat_filter = "WHERE status IN ('New', 'Under Review', 'Assigned', 'In Progress') AND category != 'Spam / Invalid'"
+    order_by = "ORDER BY citizen_reports_count DESC, created_at DESC"
+    
+    with _lock:
+        if _is_postgres():
+            with _get_pg_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(f"SELECT * FROM complaints {stat_filter} {order_by} LIMIT %s", (limit,))
+                    rows = cur.fetchall()
+                    return [dict(r) for r in rows]
+        else:
+            conn = _get_sqlite_conn()
+            try:
+                rows = conn.execute(f"SELECT * FROM complaints {stat_filter} {order_by} LIMIT ?", (limit,)).fetchall()
+                return [dict(r) for r in rows]
+            finally:
+                conn.close()
+
+
 def verify_officer_credentials(officer_id: str, password: str) -> dict[str, Any] | None:
     """Verify officer credentials and return officer profile if valid."""
     target_hash = hash_password(password)

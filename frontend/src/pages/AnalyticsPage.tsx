@@ -8,8 +8,9 @@ import { ErrorState } from '../components/ui/ErrorState';
 import { LoadingSkeleton } from '../components/ui/LoadingSkeleton';
 import type { ComplaintFilters } from '../types/filters';
 import type { Complaint } from '../types/complaint';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Sparkles } from 'lucide-react';
 import { useI18n } from '../i18n/useI18n';
+import { PolicyBriefModal } from '../components/dashboard/PolicyBriefModal';
 
 function applyFilters(complaints: Complaint[], f: ComplaintFilters): Complaint[] {
   return complaints.filter((c) => {
@@ -27,6 +28,7 @@ function applyFilters(complaints: Complaint[], f: ComplaintFilters): Complaint[]
 const AnalyticsPage: React.FC = () => {
   const { data, isLoading, isError, refetch } = useComplaints();
   const [filters, setFilters] = useState<ComplaintFilters>({});
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const { t } = useI18n();
 
   const filtered = applyFilters(data?.complaints ?? [], filters);
@@ -46,10 +48,21 @@ const AnalyticsPage: React.FC = () => {
             {t.analytics.pageSubtitle}
           </p>
         </div>
-        <button type="button" onClick={() => refetch()} className="btn-secondary" aria-label="Refresh analytics">
-          <RefreshCw className="h-4 w-4" />
-          {t.common.retry}
-        </button>
+        <div className="flex items-center gap-3">
+          <button 
+            type="button" 
+            onClick={() => setIsModalOpen(true)} 
+            className="btn-primary"
+            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+          >
+            <Sparkles className="h-4 w-4" />
+            Generate AI Policy Brief
+          </button>
+          <button type="button" onClick={() => refetch()} className="btn-secondary" aria-label="Refresh analytics">
+            <RefreshCw className="h-4 w-4" />
+            {t.common.retry}
+          </button>
+        </div>
       </div>
 
       <DashboardFilters filters={filters} onChange={setFilters} />
@@ -82,6 +95,8 @@ const AnalyticsPage: React.FC = () => {
           </div>
         </div>
       )}
+      
+      <PolicyBriefModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
     </div>
   );
 };

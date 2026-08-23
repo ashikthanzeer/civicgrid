@@ -310,6 +310,35 @@ def translate_text(text: str, target_lang: str, source_lang: str | None = None) 
     }
 
 
+def generate_policy_brief(stats: dict[str, Any], hotspots: list[dict[str, Any]]) -> str:
+    """Generate an AI-driven policy brief from stats and hotspots."""
+    if not os.getenv("GEMINI_API_KEY") or os.getenv("USE_MOCK_CLASSIFIER", "").lower() == "true":
+        return "# AI Policy Brief Unavailable\n\nPlease configure a valid Gemini API key to generate infrastructure reports."
+    
+    try:
+        client = _create_client()
+        prompt = (
+            "You are a senior civic infrastructure analyst advising the municipal commissioner.\n"
+            "Analyze the following real-time complaint statistics and top critical hotspots.\n"
+            "Write a concise, professional, 1-page executive policy brief in Markdown format.\n\n"
+            "Requirements:\n"
+            "1. Give it a clear, professional title.\n"
+            "2. Highlight the most pressing infrastructure failures.\n"
+            "3. Provide 2-3 specific, actionable recommendations for emergency budget allocation based ON THE DATA provided.\n"
+            "4. Keep it concise, punchy, and data-driven.\n"
+            "5. Do NOT include any markdown code block wrappers (like ```markdown), just return the raw markdown text.\n\n"
+            f"Overall System Statistics: {json.dumps(stats)}\n\n"
+            f"Top Critical Hotspots (Sorted by Citizen Reports & Urgency): {json.dumps(hotspots)}"
+        )
 
-
-
+        response = client.models.generate_content(
+            model=_get_model_name(),
+            contents=[prompt],
+            config=types.GenerateContentConfig(
+                response_mime_type="text/plain",
+            ),
+        )
+        return (response.text or "").strip()
+    except Exception as exc:
+        logger.error("Failed to generate policy brief: %s", exc, exc_info=True)
+        return f"# Error Generating Brief\n\nAn error occurred while generating the policy brief: {exc}"
