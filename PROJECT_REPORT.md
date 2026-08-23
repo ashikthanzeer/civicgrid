@@ -5,9 +5,9 @@
 
 ## 1. Executive Summary
 
-**CivicGrid** is a modern civic intelligence and municipal grievance platform designed to bridge the communication gap between citizens and local administrative bodies. Leveraging Google Gemini Multimodal AI, interactive geospatial mapping, and multilingual natural language processing, CivicGrid automatically categorizes, prioritizes, deduplicates, and tracks civic issues in real time.
+**CivicGrid** is a modern civic intelligence and municipal grievance platform designed to bridge the communication gap between citizens and local administrative bodies. Leveraging Google Gemini Multimodal AI, interactive geospatial mapping, and multilingual natural language processing, CivicGrid automatically categorizes, prioritizes, deduplicates, tracks, and manages civic issues through a strict state machine lifecycle and real-time SLA breach detection.
 
-Citizens can report problems (potholes, water leaks, garbage overflow, power outages) via voice, text, or photo in their native regional language. Municipal officers receive a centralized, prioritized dashboard with analytics, maps, and workflow management tools to resolve public complaints efficiently.
+Citizens can report problems (potholes, water leaks, garbage overflow, power outages) via voice, text, or photo in their native regional language and track resolution status publicly using a secret tracking token (`TK-XXXXXXXX`). Municipal officers receive a centralized, prioritized dashboard with analytics, maps, SLA timers, and proof-of-work workflow management tools to resolve public complaints efficiently.
 
 ---
 
@@ -15,16 +15,17 @@ Citizens can report problems (potholes, water leaks, garbage overflow, power out
 
 ```mermaid
 graph TD
-    A["Citizen UI / Officer Portal (React + Vite + Tailwind)"] -->|"REST API (Axios / Fetch + React Query)"| B["FastAPI Backend (Python 3.13)"]
+    A["Citizen UI / Officer Portal (React 19 + Vite + Tailwind)"] -->|"REST API (Axios / Fetch + React Query)"| B["FastAPI Backend (Python 3.13)"]
     B --> C["Gemini AI (Structured Output & Vision)"]
     B --> D["Persistence Layer (SQLite / PostgreSQL)"]
     A --> E["Google Maps & OpenStreetMap / Leaflet"]
     A --> F["Web Speech API (STT & TTS)"]
+    B --> G["SLA Breach & Lifecycle Engine"]
 ```
 
 ### 2.1 Frontend
 - **Framework**: React 19 + TypeScript + Vite.
-- **Styling**: Tailwind CSS with custom CSS variables (Light & Dark theme support).
+- **Styling**: Vanilla CSS tokens with custom CSS variables (CivicGrid Deep Indigo & Saffron theme) + Tailwind CSS.
 - **Data Fetching & State**: TanStack React Query v5 with automatic retries and exponential backoff.
 - **Mapping**: Google Maps JavaScript API (MarkerClusterer, Places Autocomplete, Geocoding) with fallback to OpenStreetMap/Leaflet.
 - **Visualization**: Recharts (Dynamic Bar, Pie, and Donut charts).
@@ -34,8 +35,9 @@ graph TD
 ### 2.2 Backend
 - **Framework**: FastAPI (Asynchronous Python REST API).
 - **AI Engine**: Google GenAI SDK (`gemini-3.6-flash`) with structured JSON schema output and vision parsing.
+- **State Machine & SLA Engine**: Strict state transition validation and dynamic SLA breach monitoring (`process_sla_breaches()`).
 - **Database Engine**: Dual-engine persistence layer supporting local/embedded **SQLite (WAL mode)** and cloud **PostgreSQL** (Neon, Supabase, Render).
-- **Security & Cryptography**: PBKDF2-HMAC-SHA256 with 100,000 iterations for officer credentials; parameterized SQL queries.
+- **Security & Cryptography**: PBKDF2-HMAC-SHA256 with 100,000 iterations for officer credentials; base64 MIME validation (<5MB); parameterized SQL queries.
 
 ---
 
@@ -79,36 +81,54 @@ graph TD
 
 ---
 
-### 📋 3.3 Complaints Directory & Incident Management
-1. **Filterable Complaints Explorer**:
-   - Multi-criteria filtering by Status, Category, Severity, Urgency, and Location.
-   - Instant search across summaries, raw text, and subcategories.
-   - Sorting by Newest, Oldest, Highest Severity, and Highest Urgency.
-   - Responsive Toggle: Switch between **Card Grid View** and **Data Table View**.
-2. **Comprehensive Complaint Details Page**:
-   - Displays complete AI metadata, raw complaint text, coordinates, visual badges, and image attachments.
-   - Interactive mini-map pin showing exact issue location.
-   - Endorsements timeline tracking cumulative citizen reports.
-3. **Officer Workflow Actions**:
-   - Status update dropdown: `New` $\rightarrow$ `Under Review` $\rightarrow$ `Assigned` $\rightarrow$ `In Progress` $\rightarrow$ `Resolved` $\rightarrow$ `Rejected / Spam`.
-   - Permanent complaint deletion with confirmation dialog.
+### 🔄 3.3 Strict Grievance Lifecycle & State Machine
+1. **Enforced Status Progression**:
+   - System enforces valid state transitions:
+     $$\text{New} \longrightarrow \text{Under Review} \Big/ \text{Assigned} \longrightarrow \text{In Progress} \longrightarrow \text{Resolved} \longrightarrow \text{Verified} \Big/ \text{Reopened}$$
+   - Direct illegal transitions (e.g. `New` $\rightarrow$ `Resolved` or `New` $\rightarrow$ `Verified`) are rejected with HTTP 422 errors.
+2. **Append-Only Activity Audit Trail**:
+   - Immutably records every lifecycle event (`CREATED`, `STATUS_CHANGED`, `ASSIGNED`, `SLA_BREACHED`, `RESOLVED`, `VERIFIED_SATISFIED`, `REOPENED_UNSATISFIED`) in the `complaint_events` table.
+   - Exposed via `GET /api/complaints/{id}/timeline` and rendered visually using the `TimelineWidget`.
 
 ---
 
-### 🗺️ 3.4 Interactive Civic GIS Map View
-1. **Geospatial Map Canvas**:
-   - Plots all geocoded complaints across the municipality.
-   - Color-coded severity pins (Red: Critical, Orange: High, Amber: Medium, Gray: Low).
-2. **Interactive Information Windows**:
-   - Clicking any pin displays a summary popup with status badges, photo preview, and direct link to the details page.
-3. **Real-time Map Filters**:
-   - Filter map markers by category, severity, urgency, and status with live badge counters.
+### ⏱️ 3.4 SLA Breach Detection & Escalation Engine
+1. **Dynamic SLA Target Calculation**:
+   - Initial resolution deadlines calculated automatically upon complaint submission:
+     - **Critical**: 24 hours
+     - **High**: 48 hours
+     - **Medium**: 72 hours
+     - **Low**: 120 hours
+2. **Automatic SLA Breach Processing**:
+   - `process_sla_breaches()` automatically scans active complaints where `sla_deadline < now`.
+   - Logs an `SLA_BREACHED` audit event, automatically escalates priority to `Critical` / `Emergency`, and flags active complaints.
+3. **Visual Breach Indicators**:
+   - Renders red `⚠️ SLA BREACHED` badges on officer dashboards and complaint cards for overdue issues.
 
 ---
 
-### 📊 3.5 Analytics & Municipal Performance Dashboard
+### 🔑 3.5 Public Citizen Tracking Token Portal
+1. **Secret Tracking Token (`TK-XXXXXXXX`)**:
+   - 12-character high-entropy alphanumeric token generated upon submission.
+2. **Public Track Page (`/track/:token`)**:
+   - Allows citizens to track real-time resolution progress, SLA countdown timers, map pin, resolution evidence photo, and timeline events without logging in.
+   - PII-sanitized public response protecting sensitive officer and citizen credentials.
+
+---
+
+### ✅ 3.6 Officer Resolution & Citizen Verification Workflow
+1. **Proof-of-Work Resolution**:
+   - Officers submit resolution notes and evidence photos (`POST /api/complaints/{id}/resolve`).
+   - Base64 payload security validation enforces JPEG/PNG/WEBP/GIF MIME headers and a 5MB maximum file size limit.
+2. **Citizen Satisfaction Verification**:
+   - Citizens can confirm resolution (`👍 Yes, Issue Solved`) or reopen the complaint (`👎 No, Reopen Issue`) with feedback (`POST /api/complaints/{id}/verify`).
+   - Anti-abuse state locks prevent repeat verification spam unless an issue is re-resolved.
+
+---
+
+### 📊 3.7 Analytics & Municipal Performance Dashboard
 1. **KPI Summary Cards**:
-   - Total Complaints, Open Issues, High-Priority Alerts, and Resolved Rate.
+   - Total Complaints, Active Issues, In Progress, Resolved Rate, and SLA Compliance Rate.
 2. **Real-Time Interactive Visualizations**:
    - **Category Distribution**: Bar chart comparing complaint volumes across civic departments.
    - **Severity Breakdown**: Donut chart displaying Low / Medium / High / Critical proportions.
@@ -118,7 +138,7 @@ graph TD
 
 ---
 
-### 🌐 3.6 Multilingual Support (i18n)
+### 🌐 3.8 Multilingual Support (i18n)
 CivicGrid provides full UI translation across **9 languages**:
 - 🇬🇧 **English (en)**
 - 🇮🇳 **Hindi (hi)** — हिन्दी
@@ -131,16 +151,17 @@ CivicGrid provides full UI translation across **9 languages**:
 
 ---
 
-### 🔐 3.7 Role-Based Access Control (RBAC) & Security
+### 🔐 3.9 Role-Based Access Control (RBAC) & Security
 1. **Role Separation**:
-   - **Citizen Mode**: Public access for browsing complaints, viewing maps, reading analytics, and submitting issues.
-   - **Officer Mode**: Restricted municipal administration portal enabling status progression, incident assignment, and record deletion.
+   - **Citizen Mode**: Public access for browsing complaints, tracking via token, viewing maps, reading analytics, and submitting issues.
+   - **Officer Mode**: Restricted municipal administration portal enabling assignment, status progression, resolution proof submission, and record deletion.
 2. **Cryptographic Authentication**:
    - Officer passwords stored using PBKDF2 with SHA-256 and salt over 100,000 rounds.
    - In-app password change feature.
    - Zero hardcoded secrets in repository.
 3. **Resilience & Protection**:
    - **SQL Injection Prevention**: Parameterized queries across all database operations.
+   - **Upload Security**: MIME type header validation and 5MB payload size capping.
    - **Render Free Tier Cold-Start Recovery**: Automatic client-side retry with backoff for HTTP 502/503/504.
    - **Cross-Origin Resource Sharing (CORS)**: Configurable origin whitelists with global preflight `OPTIONS` handlers.
 
@@ -160,7 +181,7 @@ CivicGrid provides full UI translation across **9 languages**:
 | `location` | `TEXT NOT NULL` | Ward name, landmark, or street address |
 | `affected_facility`| `TEXT NOT NULL` | Associated infrastructure |
 | `summary` | `TEXT NOT NULL` | AI-generated summary |
-| `status` | `TEXT NOT NULL` | Lifecycle state (`New`, `In Progress`, etc.) |
+| `status` | `TEXT NOT NULL` | Lifecycle state (`New`, `Assigned`, `In Progress`, `Resolved`, etc.) |
 | `created_at` | `TEXT NOT NULL` | ISO 8601 UTC timestamp |
 | `updated_at` | `TEXT NOT NULL` | ISO 8601 UTC timestamp |
 | `latitude` | `REAL` | Geographic latitude |
@@ -171,6 +192,12 @@ CivicGrid provides full UI translation across **9 languages**:
 | `duplicate_of_id` | `TEXT` | ID of original complaint if duplicate |
 | `citizen_reports_count` | `INTEGER` | Cumulative citizen support count |
 | `additional_updates` | `TEXT` | JSON array of subsequent reports & updates |
+| `department` | `TEXT` | Assigned municipal department |
+| `ward` | `TEXT` | Municipal ward or administrative zone |
+| `assigned_to` | `TEXT` | Name or ID of assigned officer |
+| `sla_deadline` | `TEXT` | Target SLA resolution deadline timestamp |
+| `resolved_at` | `TEXT` | Timestamp when issue was resolved |
+| `tracking_token` | `TEXT` | Secret 12-character public tracking token |
 
 ### 4.2 `officers` Table
 | Column Name | Type | Description |
@@ -181,6 +208,32 @@ CivicGrid provides full UI translation across **9 languages**:
 | `department` | `TEXT NOT NULL` | Assigned municipal department |
 | `created_at` | `TEXT NOT NULL` | ISO 8601 UTC timestamp |
 
+### 4.3 `complaint_events` Table
+| Column Name | Type | Description |
+|---|---|---|
+| `id` | `TEXT PRIMARY KEY` | Event ID (e.g. `EVT-XXXXXXXX`) |
+| `complaint_id` | `TEXT NOT NULL` | Associated complaint identifier |
+| `event_type` | `TEXT NOT NULL` | Event type (`CREATED`, `STATUS_CHANGED`, `ASSIGNED`, `SLA_BREACHED`, `RESOLVED`, `VERIFIED_SATISFIED`, `REOPENED_UNSATISFIED`) |
+| `actor` | `TEXT NOT NULL` | Actor name or system component (`Citizen`, `Officer`, `SLA Monitor`) |
+| `timestamp` | `TEXT NOT NULL` | ISO 8601 UTC timestamp |
+| `metadata` | `TEXT` | Additional JSON metadata |
+
+### 4.4 `resolutions` Table
+| Column Name | Type | Description |
+|---|---|---|
+| `complaint_id` | `TEXT PRIMARY KEY` | Associated complaint identifier |
+| `note` | `TEXT NOT NULL` | Proof-of-work resolution note |
+| `evidence_image` | `TEXT` | Validated photo URI or URL |
+| `submitted_at` | `TEXT NOT NULL` | ISO 8601 UTC timestamp |
+
+### 4.5 `citizen_verifications` Table
+| Column Name | Type | Description |
+|---|---|---|
+| `complaint_id` | `TEXT PRIMARY KEY` | Associated complaint identifier |
+| `result` | `TEXT NOT NULL` | `Verified` or `Reopened` |
+| `feedback` | `TEXT` | Citizen feedback comments |
+| `timestamp` | `TEXT NOT NULL` | ISO 8601 UTC timestamp |
+
 ---
 
 ## 5. REST API Specification
@@ -190,17 +243,24 @@ CivicGrid provides full UI translation across **9 languages**:
 | `POST` | `/api/complaints` | Submit and classify complaint | Public |
 | `GET` | `/api/complaints` | Filter, search & paginate complaints | Public |
 | `GET` | `/api/complaints/{id}` | Retrieve complaint by ID | Public |
-| `PATCH` / `PUT`| `/api/complaints/{id}` | Update complaint status | Officer |
+| `GET` | `/api/complaints/track/{tracking_token}` | Public tracking portal lookup | Public |
+| `PATCH` / `PUT`| `/api/complaints/{id}` | Update complaint status (with state validation) | Officer |
+| `POST` | `/api/complaints/{id}/assign` | Assign department, ward, officer & SLA | Officer |
+| `POST` | `/api/complaints/{id}/resolve` | Submit proof of work and mark Resolved | Officer |
+| `POST` | `/api/complaints/{id}/verify` | Submit citizen satisfaction feedback | Public |
+| `GET` | `/api/complaints/{id}/timeline` | Retrieve activity audit history log | Public |
 | `DELETE` | `/api/complaints/{id}` | Permanently delete complaint | Officer |
-| `GET` | `/api/complaints/stats`| Aggregate KPI counts | Public |
+| `GET` | `/api/complaints/stats`| Aggregate KPI & SLA compliance metrics | Public |
 | `POST` | `/api/officer/login` | Authenticate municipal officer | Public |
 | `POST` | `/api/officer/change-password` | Update officer password | Officer |
+| `POST` | `/api/translate` | Translate text via Gemini AI | Public |
+| `GET` | `/api/tts` | Native regional language audio playback stream | Public |
 | `GET` | `/api/health` | Health & liveness probe | Public |
 
 ---
 
 ## 6. Verification & Quality Assurance
 
-- **Backend Test Suite**: **28 passing unit & integration tests** (`pytest tests/`) validating schemas, classifier fallback, duplicate merging, SQL queries, and endpoints.
-- **Frontend Build**: Production bundle builds with **0 errors in 1.26s** (`tsc -b && vite build`).
+- **Backend Test Suite**: **37 passing unit & integration tests** (`pytest tests/`) validating schemas, state transitions, SLA breach detection, image validation, duplicate merging, SQL queries, and endpoints.
+- **Frontend Build**: Production bundle builds with **0 errors in 2.15s** (`tsc -b && vite build`).
 - **Deployments**: Live on **Vercel** (Frontend) and **Render** (Backend).
