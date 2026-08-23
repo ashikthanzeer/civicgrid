@@ -3,38 +3,64 @@ const RAW_API_BASE = import.meta.env.VITE_API_BASE_URL || '';
 // Ensure no trailing slash so ${API_BASE}${endpoint} is always well-formed
 const API_BASE = RAW_API_BASE.replace(/\/+$/, '');
 
-export async function apiClient<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+export async function apiClient<T>(
+  endpoint: string,
+  options: RequestInit = {},
+  retries = 3,
+  delayMs = 2000,
+): Promise<T> {
   const url = `${API_BASE}${endpoint}`;
-  
-  try {
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-    });
 
-    if (!response.ok) {
-      let errorDetail = response.statusText;
-      try {
-        const body = await response.json();
-        if (body?.detail) errorDetail = body.detail;
-      } catch {
-        // use statusText fallback
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const response = await fetch(url, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          ...options.headers,
+        },
+      });
+
+      if (!response.ok) {
+        let errorDetail = response.statusText;
+        try {
+          const body = await response.json();
+          if (body?.detail) errorDetail = body.detail;
+        } catch {
+          // use statusText fallback
+        }
+
+        // Retry on 502/503/504 gateway timeouts caused by Render cold start
+        if ([502, 503, 504].includes(response.status) && attempt < retries) {
+          await new Promise((resolve) => setTimeout(resolve, delayMs * (attempt + 1)));
+          continue;
+        }
+
+        throw new Error(`API Error (${response.status}): ${errorDetail}`);
       }
-      throw new Error(`API Error (${response.status}): ${errorDetail}`);
-    }
 
-    return response.json();
-  } catch (error) {
-    if (error instanceof TypeError && error.message.includes('fetch')) {
-      throw new Error(
-        `Failed to connect to backend at ${url || 'API'}. If using a free host (like Render), it may be waking up from sleep. Please wait ~30 seconds and refresh.`
-      );
+      return await response.json();
+    } catch (error) {
+      const isNetworkError =
+        error instanceof TypeError ||
+        (error instanceof Error && (error.message.includes('fetch') || error.message.includes('NetworkError')));
+
+      if (isNetworkError && attempt < retries) {
+        // Wait before retrying (Render cold start wakeup delay)
+        await new Promise((resolve) => setTimeout(resolve, delayMs * (attempt + 1)));
+        continue;
+      }
+
+      if (isNetworkError) {
+        throw new Error(
+          `Failed to connect to backend server at ${url || 'API'}. Render free host may be waking up from sleep (~30 seconds). Please click Try Again.`
+        );
+      }
+      throw error;
     }
-    throw error;
   }
+
+  throw new Error(`Failed to fetch from ${url} after ${retries} retries.`);
 }
 
 export const isMockMode = USE_MOCK;

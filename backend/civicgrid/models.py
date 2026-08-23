@@ -10,7 +10,7 @@ ComplaintStatusLiteral = Literal["New", "Under Review", "Assigned", "In Progress
 
 
 class SubmitComplaintIn(BaseModel):
-    text: str = Field(min_length=20, max_length=2000, description="Complaint description in plain language")
+    text: str = Field(min_length=10, max_length=2000, description="Complaint description in plain language")
     location: str = Field(min_length=1, max_length=100, description="Ward or location name")
     latitude: float | None = Field(default=None, description="Optional geographic latitude")
     longitude: float | None = Field(default=None, description="Optional geographic longitude")

@@ -16,7 +16,15 @@ import ComplaintDetailsPage from './pages/ComplaintDetailsPage';
 import MapPage from './pages/MapPage';
 import SettingsPage from './pages/SettingsPage';
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 3,
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 15000),
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 function AppContent() {
   const { isDark } = useTheme();
