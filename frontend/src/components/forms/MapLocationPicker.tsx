@@ -23,32 +23,35 @@ interface MapLocationPickerProps {
   disabled?: boolean;
 }
 
-/** Places search input using programmatic AutocompleteService (no legacy Autocomplete deprecation warning) */
+/** Places search input using AutocompleteService with Geocoder fallback & real-time typing sync */
 function PlacesSearchInput({
+  value,
   onSelectAddress,
   disabled,
 }: {
-  onSelectAddress: (address: string, lat: number, lng: number) => void;
+  value: string;
+  onSelectAddress: (address: string, lat?: number, lng?: number) => void;
   disabled?: boolean;
 }) {
   const { t } = useI18n();
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(value || '');
   const [predictions, setPredictions] = useState<google.maps.places.AutocompletePrediction[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const placesLib = useMapsLibrary('places');
   const serviceRef = useRef<google.maps.places.AutocompleteService | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
+  // Sync internal search query state whenever external value changes (e.g., map click or GPS)
+  useEffect(() => {
+    setQuery(value || '');
+  }, [value]);
+
   useEffect(() => {
     if (placesLib && !serviceRef.current) {
       try {
-        if ('AutocompleteSuggestion' in (placesLib as object)) {
-          serviceRef.current = new (placesLib as any).AutocompleteSuggestion();
-        } else {
-          serviceRef.current = new placesLib.AutocompleteService();
-        }
-      } catch {
         serviceRef.current = new placesLib.AutocompleteService();
+      } catch {
+        serviceRef.current = null;
       }
     }
   }, [placesLib]);
@@ -64,40 +67,107 @@ function PlacesSearchInput({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    setQuery(val);
-    if (!val.trim() || !serviceRef.current) {
+  const fetchPredictions = (inputVal: string) => {
+    if (!inputVal.trim()) {
       setPredictions([]);
       setIsOpen(false);
       return;
     }
 
-    serviceRef.current.getPlacePredictions(
-      { input: val, componentRestrictions: { country: 'in' } },
-      (results, status) => {
-        if (status === google.maps.places.PlacesServiceStatus.OK && results) {
-          setPredictions(results);
+    if (serviceRef.current) {
+      serviceRef.current.getPlacePredictions(
+        { input: inputVal, componentRestrictions: { country: 'in' } },
+        (results, status) => {
+          if (status === google.maps.places.PlacesServiceStatus.OK && results && results.length > 0) {
+            setPredictions(results);
+            setIsOpen(true);
+          } else {
+            // Retry without strict country restriction if no India-specific results match
+            serviceRef.current?.getPlacePredictions({ input: inputVal }, (globalResults, globalStatus) => {
+              if (globalStatus === google.maps.places.PlacesServiceStatus.OK && globalResults && globalResults.length > 0) {
+                setPredictions(globalResults);
+                setIsOpen(true);
+              } else {
+                fallbackGeocoderSearch(inputVal);
+              }
+            });
+          }
+        },
+      );
+    } else {
+      fallbackGeocoderSearch(inputVal);
+    }
+  };
+
+  const fallbackGeocoderSearch = (inputVal: string) => {
+    if (typeof google !== 'undefined' && google.maps?.Geocoder) {
+      const geocoder = new google.maps.Geocoder();
+      geocoder.geocode({ address: inputVal, componentRestrictions: { country: 'IN' } }, (results, status) => {
+        if (status === 'OK' && results && results.length > 0) {
+          const mockPredictions = results.map((res) => ({
+            description: res.formatted_address,
+            place_id: res.place_id,
+            matched_substrings: [],
+            structured_formatting: { main_text: res.formatted_address, secondary_text: '' },
+            terms: [],
+            types: [],
+          })) as unknown as google.maps.places.AutocompletePrediction[];
+          setPredictions(mockPredictions);
           setIsOpen(true);
         } else {
           setPredictions([]);
           setIsOpen(false);
         }
-      },
-    );
+      });
+    } else {
+      setPredictions([]);
+      setIsOpen(false);
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setQuery(val);
+    // Real-time sync: inform parent component immediately as user types
+    onSelectAddress(val);
+    fetchPredictions(val);
   };
 
   const handleSelect = (prediction: google.maps.places.AutocompletePrediction) => {
-    const geocoder = new google.maps.Geocoder();
-    geocoder.geocode({ placeId: prediction.place_id }, (results, status) => {
-      if (status === 'OK' && results?.[0]?.geometry?.location) {
-        const loc = results[0].geometry.location;
-        const address = results[0].formatted_address || prediction.description;
-        setQuery(address);
-        setIsOpen(false);
-        onSelectAddress(address, loc.lat(), loc.lng());
+    const address = prediction.description;
+    setQuery(address);
+    setIsOpen(false);
+
+    if (typeof google !== 'undefined' && google.maps?.Geocoder) {
+      const geocoder = new google.maps.Geocoder();
+      geocoder.geocode({ placeId: prediction.place_id }, (results, status) => {
+        if (status === 'OK' && results?.[0]?.geometry?.location) {
+          const loc = results[0].geometry.location;
+          onSelectAddress(results[0].formatted_address || address, loc.lat(), loc.lng());
+        } else {
+          onSelectAddress(address);
+        }
+      });
+    } else {
+      onSelectAddress(address);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (predictions.length > 0) {
+        handleSelect(predictions[0]);
+      } else if (query.trim() && typeof google !== 'undefined' && google.maps?.Geocoder) {
+        const geocoder = new google.maps.Geocoder();
+        geocoder.geocode({ address: query }, (results, status) => {
+          if (status === 'OK' && results?.[0]?.geometry?.location) {
+            const loc = results[0].geometry.location;
+            onSelectAddress(results[0].formatted_address || query, loc.lat(), loc.lng());
+          }
+        });
       }
-    });
+    }
   };
 
   return (
@@ -111,8 +181,10 @@ function PlacesSearchInput({
           type="text"
           value={query}
           onChange={handleInputChange}
+          onKeyDown={handleKeyDown}
           onFocus={() => {
             if (predictions.length > 0) setIsOpen(true);
+            else if (query.trim()) fetchPredictions(query);
           }}
           placeholder={t.location.searchPlaceholder}
           disabled={disabled}
@@ -215,9 +287,11 @@ export const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
   );
 
   const handleSelectAddress = useCallback(
-    (address: string, lat: number, lng: number) => {
-      setMarkerPos({ lat, lng });
-      setCenterTarget({ lat, lng });
+    (address: string, lat?: number, lng?: number) => {
+      if (lat != null && lng != null) {
+        setMarkerPos({ lat, lng });
+        setCenterTarget({ lat, lng });
+      }
       onChange(address, lat, lng);
     },
     [onChange],
@@ -275,7 +349,7 @@ export const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
     <div className="space-y-3">
       {/* Search + GPS button */}
       <div className="flex gap-2">
-        <PlacesSearchInput onSelectAddress={handleSelectAddress} disabled={disabled} />
+        <PlacesSearchInput value={value} onSelectAddress={handleSelectAddress} disabled={disabled} />
         <button
           type="button"
           onClick={handleGeolocate}
