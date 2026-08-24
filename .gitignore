@@ -171,3 +171,5 @@ openspec/changes/*
 
 openspec/
 .github/
+DEMO_SCRIPT_NARRATION.txt
+PROJECT_REPORT.md
