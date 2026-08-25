@@ -3,6 +3,7 @@ import { X, Grid3X3 } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { navItemDefs } from './Sidebar';
 import { useI18n } from '../../i18n/useI18n';
+import { useRole } from '../../context/RoleContext';
 
 interface NavDrawerProps {
   isOpen: boolean;
@@ -11,6 +12,7 @@ interface NavDrawerProps {
 
 export const NavDrawer: React.FC<NavDrawerProps> = ({ isOpen, onClose }) => {
   const { t } = useI18n();
+  const { user, role } = useRole();
 
   useEffect(() => {
     if (!isOpen) return;
@@ -30,6 +32,13 @@ export const NavDrawer: React.FC<NavDrawerProps> = ({ isOpen, onClose }) => {
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
+
+  const visibleItems = navItemDefs.filter((item) => {
+    if (item.guestOnly && user) return false;
+    if (item.authRequired && !user) return false;
+    if (item.roles && !item.roles.includes(role as 'citizen' | 'officer' | 'admin')) return false;
+    return true;
+  });
 
   return (
     <div
@@ -105,7 +114,7 @@ export const NavDrawer: React.FC<NavDrawerProps> = ({ isOpen, onClose }) => {
 
         {/* Navigation links */}
         <nav className="flex-1 space-y-1.5 overflow-y-auto p-4" aria-label="Mobile Navigation">
-          {navItemDefs.map((item) => {
+          {visibleItems.map((item) => {
             const Icon = item.icon;
             const label = (t.nav as Record<string, string>)[item.key] || item.label;
             return (

@@ -66,8 +66,8 @@ export const Topbar: React.FC<TopbarProps> = ({ onMenuClick, menuOpen = false })
       </div>
 
       <div className="flex items-center gap-2 sm:gap-3">
-        {/* Quick report button on mobile/desktop when not on submit page */}
-        {!isSubmitPage && (
+        {/* Quick report button — only for authenticated users not already on submit page */}
+        {!isSubmitPage && user && (
           <Link
             to="/submit"
             className="hidden sm:inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold"

@@ -12,8 +12,10 @@ import {
   UserCheck,
   ShieldCheck,
   ShieldAlert,
+  LogIn,
 } from 'lucide-react';
 import { useI18n } from '../../i18n/useI18n';
+import { useRole } from '../../context/RoleContext';
 
 export interface NavItemDef {
   key: string;
@@ -21,19 +23,26 @@ export interface NavItemDef {
   label: string;
   icon: typeof Home;
   end: boolean;
+  /** roles that can see this item; undefined = all */
+  roles?: ('citizen' | 'officer' | 'admin')[];
+  /** if true, only show when logged OUT */
+  guestOnly?: boolean;
+  /** if true, only show when logged IN */
+  authRequired?: boolean;
 }
 
 export const navItemDefs: NavItemDef[] = [
-  { key: 'home', path: '/', label: 'Home', icon: Home, end: true },
-  { key: 'citizen', path: '/citizen', label: 'Citizen Portal', icon: UserCheck, end: false },
-  { key: 'officer', path: '/officer', label: 'Officer Desk', icon: ShieldCheck, end: false },
-  { key: 'admin', path: '/admin', label: 'Admin Portal', icon: ShieldAlert, end: false },
-  { key: 'submit', path: '/submit', label: 'File Grievance', icon: FilePlus2, end: false },
-  { key: 'dashboard', path: '/dashboard', label: 'Overview Dashboard', icon: LayoutDashboard, end: false },
-  { key: 'analytics', path: '/analytics', label: 'AI Analytics', icon: BarChart3, end: false },
-  { key: 'complaints', path: '/complaints', label: 'All Complaints', icon: List, end: false },
-  { key: 'map', path: '/map', label: 'Grievance Map', icon: MapPinned, end: false },
-  { key: 'settings', path: '/settings', label: 'Settings', icon: Settings, end: false },
+  { key: 'home',      path: '/',          label: 'Home',              icon: Home,         end: true  },
+  { key: 'login',     path: '/login',     label: 'Sign In',           icon: LogIn,        end: false, guestOnly: true },
+  { key: 'citizen',   path: '/citizen',   label: 'My Portal',         icon: UserCheck,    end: false, roles: ['citizen'], authRequired: true },
+  { key: 'submit',    path: '/submit',    label: 'File Grievance',    icon: FilePlus2,    end: false, roles: ['citizen'], authRequired: true },
+  { key: 'officer',   path: '/officer',   label: 'Officer Desk',      icon: ShieldCheck,  end: false, roles: ['officer'], authRequired: true },
+  { key: 'admin',     path: '/admin',     label: 'Admin Portal',      icon: ShieldAlert,  end: false, roles: ['admin'],   authRequired: true },
+  { key: 'dashboard', path: '/dashboard', label: 'Overview Dashboard',icon: LayoutDashboard, end: false, roles: ['officer', 'admin'], authRequired: true },
+  { key: 'analytics', path: '/analytics', label: 'AI Analytics',      icon: BarChart3,    end: false, roles: ['officer', 'admin'], authRequired: true },
+  { key: 'complaints',path: '/complaints',label: 'All Complaints',    icon: List,         end: false, roles: ['officer', 'admin'], authRequired: true },
+  { key: 'map',       path: '/map',       label: 'Grievance Map',     icon: MapPinned,    end: false, roles: ['officer', 'admin'], authRequired: true },
+  { key: 'settings',  path: '/settings',  label: 'Settings',          icon: Settings,     end: false },
 ];
 
 interface SidebarProps {
@@ -43,6 +52,14 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ className = '', onNavigate }) => {
   const { t } = useI18n();
+  const { user, role } = useRole();
+
+  const visibleItems = navItemDefs.filter((item) => {
+    if (item.guestOnly && user) return false;
+    if (item.authRequired && !user) return false;
+    if (item.roles && !item.roles.includes(role as 'citizen' | 'officer' | 'admin')) return false;
+    return true;
+  });
 
   return (
     <aside className={`flex h-full w-full flex-col ${className}`} style={{ backgroundColor: 'var(--color-surface)' }}>
@@ -65,7 +82,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ className = '', onNavigate }) 
       </div>
 
       <nav className="flex-1 space-y-1 overflow-y-auto p-4" aria-label="Primary">
-        {navItemDefs.map((item) => {
+        {visibleItems.map((item) => {
           const Icon = item.icon;
           const label = (t.nav as Record<string, string>)[item.key] || item.label;
           return (
