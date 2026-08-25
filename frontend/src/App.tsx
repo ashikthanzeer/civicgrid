@@ -28,6 +28,11 @@ const queryClient = new QueryClient({
 
 import { PublicTrackPage } from './pages/PublicTrackPage';
 
+import { LoginPage } from './pages/LoginPage';
+import { CitizenPortal } from './pages/CitizenPortal';
+import { OfficerPortal } from './pages/OfficerPortal';
+import { AdminPortal } from './pages/AdminPortal';
+
 function AppContent() {
   const { isDark } = useTheme();
   const palette = isDark ? darkTokens : lightTokens;
@@ -78,6 +83,10 @@ function AppContent() {
           <Routes>
             <Route element={<AppShell />}>
               <Route path="/" element={<LandingPage />} />
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/citizen" element={<CitizenPortal />} />
+              <Route path="/officer" element={<OfficerPortal />} />
+              <Route path="/admin" element={<AdminPortal />} />
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/analytics" element={<AnalyticsPage />} />
               <Route path="/complaints" element={<ComplaintsPage />} />

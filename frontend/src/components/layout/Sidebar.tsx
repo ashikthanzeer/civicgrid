@@ -9,24 +9,31 @@ import {
   Settings,
   Grid3X3,
   MapPinned,
+  UserCheck,
+  ShieldCheck,
+  ShieldAlert,
 } from 'lucide-react';
 import { useI18n } from '../../i18n/useI18n';
 
 export interface NavItemDef {
-  key: 'home' | 'submit' | 'dashboard' | 'analytics' | 'complaints' | 'map' | 'settings';
+  key: string;
   path: string;
+  label: string;
   icon: typeof Home;
   end: boolean;
 }
 
 export const navItemDefs: NavItemDef[] = [
-  { key: 'home', path: '/', icon: Home, end: true },
-  { key: 'submit', path: '/submit', icon: FilePlus2, end: false },
-  { key: 'dashboard', path: '/dashboard', icon: LayoutDashboard, end: false },
-  { key: 'analytics', path: '/analytics', icon: BarChart3, end: false },
-  { key: 'complaints', path: '/complaints', icon: List, end: false },
-  { key: 'map', path: '/map', icon: MapPinned, end: false },
-  { key: 'settings', path: '/settings', icon: Settings, end: false },
+  { key: 'home', path: '/', label: 'Home', icon: Home, end: true },
+  { key: 'citizen', path: '/citizen', label: 'Citizen Portal', icon: UserCheck, end: false },
+  { key: 'officer', path: '/officer', label: 'Officer Desk', icon: ShieldCheck, end: false },
+  { key: 'admin', path: '/admin', label: 'Admin Portal', icon: ShieldAlert, end: false },
+  { key: 'submit', path: '/submit', label: 'File Grievance', icon: FilePlus2, end: false },
+  { key: 'dashboard', path: '/dashboard', label: 'Overview Dashboard', icon: LayoutDashboard, end: false },
+  { key: 'analytics', path: '/analytics', label: 'AI Analytics', icon: BarChart3, end: false },
+  { key: 'complaints', path: '/complaints', label: 'All Complaints', icon: List, end: false },
+  { key: 'map', path: '/map', label: 'Grievance Map', icon: MapPinned, end: false },
+  { key: 'settings', path: '/settings', label: 'Settings', icon: Settings, end: false },
 ];
 
 interface SidebarProps {
@@ -60,7 +67,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ className = '', onNavigate }) 
       <nav className="flex-1 space-y-1 overflow-y-auto p-4" aria-label="Primary">
         {navItemDefs.map((item) => {
           const Icon = item.icon;
-          const label = t.nav[item.key];
+          const label = (t.nav as Record<string, string>)[item.key] || item.label;
           return (
             <NavLink
               key={item.path}

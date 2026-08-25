@@ -137,4 +137,34 @@ export const getComplaintTimeline = async (id: string): Promise<import('../types
   return apiClient<import('../types/complaint').ComplaintEvent[]>(`/api/complaints/${id}/timeline`);
 };
 
+export const getAdminUsers = async (role?: string): Promise<import('../context/RoleContext').UserProfile[]> => {
+  const query = role ? `?role=${role}` : '';
+  return apiClient<import('../context/RoleContext').UserProfile[]>(`/api/admin/users${query}`);
+};
+
+export const createAdminUser = async (data: {
+  name: string;
+  email: string;
+  password: string;
+  role: string;
+  department?: string;
+  ward?: string;
+}): Promise<import('../context/RoleContext').UserProfile> => {
+  return apiClient<import('../context/RoleContext').UserProfile>('/api/admin/users', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+export const updateAdminUser = async (
+  userId: string,
+  data: { name?: string; role?: string; department?: string; ward?: string; status?: string },
+): Promise<import('../context/RoleContext').UserProfile> => {
+  return apiClient<import('../context/RoleContext').UserProfile>(`/api/admin/users/${userId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+};
+
+
 

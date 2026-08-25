@@ -19,8 +19,23 @@ DB_PATH = os.environ.get("CIVICGRID_DB_PATH", _DB_PATH_DEFAULT)
 _lock = threading.RLock()
 
 _CREATE_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS users (
+    id            TEXT PRIMARY KEY,
+    email         TEXT UNIQUE NOT NULL,
+    name          TEXT NOT NULL,
+    password_hash TEXT NOT NULL,
+    role          TEXT NOT NULL DEFAULT 'CITIZEN',
+    department    TEXT,
+    ward          TEXT,
+    status        TEXT NOT NULL DEFAULT 'ACTIVE',
+    created_at    TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_role  ON users(role);
+
 CREATE TABLE IF NOT EXISTS complaints (
     id                TEXT PRIMARY KEY,
+    citizen_id        TEXT,
     raw_text          TEXT NOT NULL,
     category          TEXT NOT NULL,
     subcategory       TEXT NOT NULL,
@@ -51,6 +66,7 @@ CREATE TABLE IF NOT EXISTS complaints (
 CREATE INDEX IF NOT EXISTS idx_complaints_status   ON complaints(status);
 CREATE INDEX IF NOT EXISTS idx_complaints_category ON complaints(category);
 CREATE INDEX IF NOT EXISTS idx_complaints_created  ON complaints(created_at);
+CREATE INDEX IF NOT EXISTS idx_complaints_citizen  ON complaints(citizen_id);
 
 CREATE TABLE IF NOT EXISTS officers (
     officer_id    TEXT PRIMARY KEY,
@@ -110,7 +126,8 @@ def _get_pg_conn():
 
 
 def _get_sqlite_conn() -> sqlite3.Connection:
-    path = os.path.abspath(DB_PATH)
+    db_path = os.environ.get("CIVICGRID_DB_PATH") or DB_PATH
+    path = os.path.abspath(db_path)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     conn = sqlite3.connect(path, check_same_thread=False)
     conn.row_factory = sqlite3.Row
@@ -127,26 +144,49 @@ def hash_password(password: str) -> str:
     return hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), _SALT.encode("utf-8"), 100000).hex()
 
 
-def _seed_officer(conn_or_cur, is_pg: bool):
-    pw_hash = hash_password("password123")
+def _seed_initial_users(conn_or_cur, is_pg: bool):
     now = datetime.now(timezone.utc).isoformat()
-    if is_pg:
-        conn_or_cur.execute(
-            """
-            INSERT INTO officers (officer_id, password_hash, name, department, created_at)
-            VALUES (%s, %s, %s, %s, %s)
-            ON CONFLICT (officer_id) DO NOTHING
-            """,
-            ("OFFICER-2026", pw_hash, "Officer R. Sharma", "Municipal Public Works", now),
-        )
-    else:
-        conn_or_cur.execute(
-            """
-            INSERT OR IGNORE INTO officers (officer_id, password_hash, name, department, created_at)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            ("OFFICER-2026", pw_hash, "Officer R. Sharma", "Municipal Public Works", now),
-        )
+    default_users = [
+        ("USER-ADMIN-001", "admin@civicgrid.gov.in", "System Administrator", hash_password("admin123"), "ADMIN", None, None, "ACTIVE", now),
+        ("OFFICER-2026", "officer1@civicgrid.gov.in", "Officer R. Sharma", hash_password("password123"), "OFFICER", "Municipal Public Works", "Ward 12", "ACTIVE", now),
+        ("OFFICER-HEALTH", "officer2@civicgrid.gov.in", "Officer S. Gupta", hash_password("password123"), "OFFICER", "Health & Sanitation", "Ward 7", "ACTIVE", now),
+        ("USER-CITIZEN-001", "citizen.a@example.com", "Ananya Sharma", hash_password("password123"), "CITIZEN", None, None, "ACTIVE", now),
+        ("USER-CITIZEN-002", "citizen.b@example.com", "Bharat Kumar", hash_password("password123"), "CITIZEN", None, None, "ACTIVE", now),
+    ]
+
+    for uid, email, name, pw_hash, role, dep, ward, status_val, created in default_users:
+        if is_pg:
+            conn_or_cur.execute(
+                """
+                INSERT INTO users (id, email, name, password_hash, role, department, ward, status, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (id) DO NOTHING
+                """,
+                (uid, email, name, pw_hash, role, dep, ward, status_val, created),
+            )
+            conn_or_cur.execute(
+                """
+                INSERT INTO officers (officer_id, password_hash, name, department, created_at)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (officer_id) DO NOTHING
+                """,
+                (uid, pw_hash, name, dep or "General", created),
+            )
+        else:
+            conn_or_cur.execute(
+                """
+                INSERT OR IGNORE INTO users (id, email, name, password_hash, role, department, ward, status, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (uid, email, name, pw_hash, role, dep, ward, status_val, created),
+            )
+            conn_or_cur.execute(
+                """
+                INSERT OR IGNORE INTO officers (officer_id, password_hash, name, department, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (uid, pw_hash, name, dep or "General", created),
+            )
 
 
 def init_db() -> None:
@@ -156,6 +196,7 @@ def init_db() -> None:
             with _get_pg_conn() as conn:
                 with conn.cursor() as cur:
                     cur.execute(_CREATE_TABLE_SQL)
+                    cur.execute("ALTER TABLE complaints ADD COLUMN IF NOT EXISTS citizen_id TEXT;")
                     cur.execute("ALTER TABLE complaints ADD COLUMN IF NOT EXISTS latitude REAL;")
                     cur.execute("ALTER TABLE complaints ADD COLUMN IF NOT EXISTS longitude REAL;")
                     cur.execute("ALTER TABLE complaints ADD COLUMN IF NOT EXISTS image_url TEXT;")
@@ -171,7 +212,7 @@ def init_db() -> None:
                     cur.execute("ALTER TABLE complaints ADD COLUMN IF NOT EXISTS sla_deadline TEXT;")
                     cur.execute("ALTER TABLE complaints ADD COLUMN IF NOT EXISTS resolved_at TEXT;")
                     cur.execute("ALTER TABLE complaints ADD COLUMN IF NOT EXISTS tracking_token TEXT;")
-                    _seed_officer(cur, is_pg=True)
+                    _seed_initial_users(cur, is_pg=True)
                 conn.commit()
         else:
             conn = _get_sqlite_conn()
@@ -179,7 +220,7 @@ def init_db() -> None:
                 conn.executescript(_CREATE_TABLE_SQL)
                 # Migration for existing SQLite DBs
                 cols = [
-                    "latitude REAL", "longitude REAL", "image_url TEXT", "image_analysis TEXT", 
+                    "citizen_id TEXT", "latitude REAL", "longitude REAL", "image_url TEXT", "image_analysis TEXT", 
                     "is_duplicate INTEGER DEFAULT 0", "duplicate_of_id TEXT", "citizen_reports_count INTEGER DEFAULT 1", 
                     "additional_updates TEXT DEFAULT '[]'", "detected_language TEXT DEFAULT 'English'",
                     "department TEXT", "ward TEXT", "assigned_to TEXT", 
@@ -190,7 +231,7 @@ def init_db() -> None:
                         conn.execute(f"ALTER TABLE complaints ADD COLUMN {col}")
                     except sqlite3.OperationalError:
                         pass
-                _seed_officer(conn, is_pg=False)
+                _seed_initial_users(conn, is_pg=False)
                 conn.commit()
             finally:
                 conn.close()
@@ -227,6 +268,215 @@ def _next_id_pg(conn) -> str:
         return f"{prefix}{n:04d}"
 
 
+def create_user(
+    *,
+    name: str,
+    email: str,
+    password: str,
+    role: str = "CITIZEN",
+    department: str | None = None,
+    ward: str | None = None,
+) -> dict[str, Any]:
+    """Create a new user account."""
+    email_clean = email.strip().lower()
+    if get_user_by_email(email_clean):
+        raise ValueError(f"An account with email {email_clean!r} already exists.")
+
+    pw_hash = hash_password(password)
+    now = datetime.now(timezone.utc).isoformat()
+    prefix = f"USER-{role.upper()}-"
+    token_suffix = secrets.token_hex(3).upper()
+    user_id = f"{prefix}{token_suffix}"
+
+    with _lock:
+        if _is_postgres():
+            with _get_pg_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        INSERT INTO users (id, email, name, password_hash, role, department, ward, status, created_at)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, 'ACTIVE', %s)
+                        RETURNING *
+                        """,
+                        (user_id, email_clean, name, pw_hash, role, department, ward, now),
+                    )
+                    row = cur.fetchone()
+                    if role == "OFFICER":
+                        cur.execute(
+                            """
+                            INSERT INTO officers (officer_id, password_hash, name, department, created_at)
+                            VALUES (%s, %s, %s, %s, %s)
+                            ON CONFLICT (officer_id) DO NOTHING
+                            """,
+                            (user_id, pw_hash, name, department or "General", now),
+                        )
+                conn.commit()
+                res = dict(row)
+        else:
+            conn = _get_sqlite_conn()
+            try:
+                conn.execute(
+                    """
+                    INSERT INTO users (id, email, name, password_hash, role, department, ward, status, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, 'ACTIVE', ?)
+                    """,
+                    (user_id, email_clean, name, pw_hash, role, department, ward, now),
+                )
+                if role == "OFFICER":
+                    conn.execute(
+                        """
+                        INSERT OR IGNORE INTO officers (officer_id, password_hash, name, department, created_at)
+                        VALUES (?, ?, ?, ?, ?)
+                        """,
+                        (user_id, pw_hash, name, department or "General", now),
+                    )
+                conn.commit()
+                row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+                res = dict(row)
+            finally:
+                conn.close()
+
+    res.pop("password_hash", None)
+    return res
+
+
+def get_user_by_id(user_id: str) -> dict[str, Any] | None:
+    """Retrieve user record by user_id."""
+    with _lock:
+        if _is_postgres():
+            with _get_pg_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT * FROM users WHERE id = %s", (user_id,))
+                    row = cur.fetchone()
+                    return dict(row) if row else None
+        else:
+            conn = _get_sqlite_conn()
+            try:
+                row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+                return dict(row) if row else None
+            finally:
+                conn.close()
+
+
+def get_user_by_email(email: str) -> dict[str, Any] | None:
+    """Retrieve user record by email."""
+    email_clean = email.strip().lower()
+    with _lock:
+        if _is_postgres():
+            with _get_pg_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT * FROM users WHERE LOWER(email) = %s OR id = %s", (email_clean, email.strip()))
+                    row = cur.fetchone()
+                    return dict(row) if row else None
+        else:
+            conn = _get_sqlite_conn()
+            try:
+                row = conn.execute(
+                    "SELECT * FROM users WHERE LOWER(email) = ? OR id = ?",
+                    (email_clean, email.strip()),
+                ).fetchone()
+                return dict(row) if row else None
+            finally:
+                conn.close()
+
+
+def verify_user_credentials(email_or_id: str, password: str) -> dict[str, Any] | None:
+    """Verify user credentials matching email/ID and hashed password."""
+    target_hash = hash_password(password)
+    user = get_user_by_email(email_or_id) or get_user_by_id(email_or_id)
+    if user and user.get("password_hash") == target_hash:
+        u_copy = dict(user)
+        u_copy.pop("password_hash", None)
+        return u_copy
+    return None
+
+
+def list_users(role: str | None = None) -> list[dict[str, Any]]:
+    """List registered users with optional role filtering."""
+    with _lock:
+        if _is_postgres():
+            with _get_pg_conn() as conn:
+                with conn.cursor() as cur:
+                    if role:
+                        cur.execute("SELECT * FROM users WHERE role = %s ORDER BY created_at DESC", (role.upper(),))
+                    else:
+                        cur.execute("SELECT * FROM users ORDER BY created_at DESC")
+                    rows = cur.fetchall()
+                    res = [dict(r) for r in rows]
+        else:
+            conn = _get_sqlite_conn()
+            try:
+                if role:
+                    rows = conn.execute("SELECT * FROM users WHERE role = ? ORDER BY created_at DESC", (role.upper(),)).fetchall()
+                else:
+                    rows = conn.execute("SELECT * FROM users ORDER BY created_at DESC").fetchall()
+                res = [dict(r) for r in rows]
+            finally:
+                conn.close()
+
+    for u in res:
+        u.pop("password_hash", None)
+    return res
+
+
+def update_user(
+    user_id: str,
+    *,
+    name: str | None = None,
+    role: str | None = None,
+    department: str | None = None,
+    ward: str | None = None,
+    status: str | None = None,
+) -> dict[str, Any] | None:
+    """Update user profile/role/department/ward/status attributes."""
+    user = get_user_by_id(user_id)
+    if not user:
+        return None
+
+    new_name = name if name is not None else user.get("name")
+    new_role = role.upper() if role is not None else user.get("role")
+    new_dep = department if department is not None else user.get("department")
+    new_ward = ward if ward is not None else user.get("ward")
+    new_status = status if status is not None else user.get("status")
+
+    with _lock:
+        if _is_postgres():
+            with _get_pg_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        UPDATE users
+                        SET name = %s, role = %s, department = %s, ward = %s, status = %s
+                        WHERE id = %s
+                        RETURNING *
+                        """,
+                        (new_name, new_role, new_dep, new_ward, new_status, user_id),
+                    )
+                    row = cur.fetchone()
+                conn.commit()
+                res = dict(row) if row else None
+        else:
+            conn = _get_sqlite_conn()
+            try:
+                conn.execute(
+                    """
+                    UPDATE users
+                    SET name = ?, role = ?, department = ?, ward = ?, status = ?
+                    WHERE id = ?
+                    """,
+                    (new_name, new_role, new_dep, new_ward, new_status, user_id),
+                )
+                conn.commit()
+                r = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+                res = dict(r) if r else None
+            finally:
+                conn.close()
+
+    if res:
+        res.pop("password_hash", None)
+    return res
+
+
 def generate_tracking_token() -> str:
     """Generate a unique 12-character public tracking token."""
     return f"TK-{secrets.token_hex(4).upper()}"
@@ -251,6 +501,7 @@ def insert_complaint(
     affected_facility: str,
     summary: str,
     status: str = "New",
+    citizen_id: str | None = None,
     latitude: float | None = None,
     longitude: float | None = None,
     image_url: str | None = None,
@@ -279,15 +530,16 @@ def insert_complaint(
                     cur.execute(
                         """
                         INSERT INTO complaints
-                          (id, raw_text, category, subcategory, severity, urgency,
+                          (id, citizen_id, raw_text, category, subcategory, severity, urgency,
                            location, affected_facility, summary, status, created_at, updated_at,
                            latitude, longitude, image_url, image_analysis, is_duplicate, duplicate_of_id, detected_language,
                            department, ward, assigned_to, sla_deadline, resolved_at, tracking_token)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         RETURNING *
                         """,
                         (
                             complaint_id,
+                            citizen_id,
                             raw_text,
                             category,
                             subcategory,
@@ -324,14 +576,15 @@ def insert_complaint(
                 conn.execute(
                     """
                     INSERT INTO complaints
-                      (id, raw_text, category, subcategory, severity, urgency,
+                      (id, citizen_id, raw_text, category, subcategory, severity, urgency,
                        location, affected_facility, summary, status, created_at, updated_at,
                        latitude, longitude, image_url, image_analysis, is_duplicate, duplicate_of_id, detected_language,
                        department, ward, assigned_to, sla_deadline, resolved_at, tracking_token)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         complaint_id,
+                        citizen_id,
                         raw_text,
                         category,
                         subcategory,
@@ -368,7 +621,7 @@ def insert_complaint(
     log_complaint_event(
         complaint_id=res_dict["id"],
         event_type="CREATED",
-        actor="Citizen",
+        actor=f"Citizen ({citizen_id})" if citizen_id else "Citizen",
         metadata=json.dumps({"category": category, "severity": severity, "tracking_token": token}),
     )
     return res_dict
@@ -404,8 +657,11 @@ def list_complaints(
     sort: str = "newest",
     skip: int = 0,
     limit: int = 100,
+    citizen_id: str | None = None,
+    officer_department: str | None = None,
+    officer_ward: str | None = None,
 ) -> tuple[list[dict[str, Any]], int]:
-    """Return (complaints, total_count) applying filters, sort, and pagination."""
+    """Return (complaints, total_count) applying RBAC scope, filters, sort, and pagination."""
     process_sla_breaches()
     conditions: list[str] = []
     params: list[Any] = []
@@ -416,6 +672,18 @@ def list_complaints(
         placeholders = ",".join(ph * len(vals))
         conditions.append(f"{col} IN ({placeholders})")
         params.extend(vals)
+
+    if citizen_id:
+        conditions.append(f"citizen_id = {ph}")
+        params.append(citizen_id)
+
+    if officer_department:
+        conditions.append(f"department = {ph}")
+        params.append(officer_department)
+
+    if officer_ward and officer_ward not in ("All", ""):
+        conditions.append(f"(ward = {ph} OR ward IS NULL OR ward = 'All')")
+        params.append(officer_ward)
 
     if status:
         _in("status", status)

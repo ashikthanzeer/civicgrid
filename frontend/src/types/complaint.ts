@@ -20,6 +20,7 @@ export type ComplaintCategory =
 
 export interface Complaint {
   id: string;
+  citizen_id?: string | null;
   raw_text: string;
   category: string;
   subcategory: string;

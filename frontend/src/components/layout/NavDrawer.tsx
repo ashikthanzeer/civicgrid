@@ -107,7 +107,7 @@ export const NavDrawer: React.FC<NavDrawerProps> = ({ isOpen, onClose }) => {
         <nav className="flex-1 space-y-1.5 overflow-y-auto p-4" aria-label="Mobile Navigation">
           {navItemDefs.map((item) => {
             const Icon = item.icon;
-            const label = t.nav[item.key];
+            const label = (t.nav as Record<string, string>)[item.key] || item.label;
             return (
               <NavLink
                 key={item.path}

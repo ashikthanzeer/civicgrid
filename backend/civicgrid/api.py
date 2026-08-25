@@ -5,10 +5,11 @@ import logging
 from contextlib import asynccontextmanager
 from typing import Annotated
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import database as db
+from .auth import create_access_token, get_current_user, get_optional_user, require_roles
 from .classifier import make_classifier
 from .gemini import ComplaintInputError, GeminiConfigurationError, GeminiExtractionError
 from .models import (
@@ -30,6 +31,12 @@ from .models import (
     TimelineEventOut,
     ResolutionOut,
     VerificationOut,
+    UserRegisterIn,
+    UserLoginIn,
+    UserProfileOut,
+    AuthTokenOut,
+    UserAdminCreateIn,
+    UserAdminUpdateIn,
 )
 
 logger = logging.getLogger(__name__)
@@ -105,7 +112,75 @@ async def custom_http_exception_handler(request: Request, exc: StarletteHTTPExce
 
 
 # ---------------------------------------------------------------------------
-# Endpoints
+# Authentication Endpoints
+# ---------------------------------------------------------------------------
+
+
+@app.post(
+    "/api/auth/register",
+    response_model=AuthTokenOut,
+    status_code=201,
+    summary="Register new Citizen account",
+    tags=["auth"],
+)
+def register_user(req: UserRegisterIn) -> AuthTokenOut:
+    try:
+        user = db.create_user(name=req.name, email=req.email, password=req.password, role="CITIZEN")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    token = create_access_token(
+        user_id=user["id"],
+        email=user["email"],
+        role=user["role"],
+        department=user.get("department"),
+        ward=user.get("ward"),
+    )
+    return AuthTokenOut(access_token=token, user=UserProfileOut(**user))
+
+
+@app.post(
+    "/api/auth/login",
+    response_model=AuthTokenOut,
+    summary="Authenticate Citizen, Officer, or Admin",
+    tags=["auth"],
+)
+def login_user(req: UserLoginIn) -> AuthTokenOut:
+    user = db.verify_user_credentials(req.email, req.password)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid email/ID or password.")
+
+    token = create_access_token(
+        user_id=user["id"],
+        email=user["email"],
+        role=user["role"],
+        department=user.get("department"),
+        ward=user.get("ward"),
+    )
+    return AuthTokenOut(access_token=token, user=UserProfileOut(**user))
+
+
+@app.get(
+    "/api/auth/me",
+    response_model=UserProfileOut,
+    summary="Get current authenticated user profile",
+    tags=["auth"],
+)
+def get_me(current_user: dict = Depends(get_current_user)) -> UserProfileOut:
+    return UserProfileOut(**current_user)
+
+
+@app.post(
+    "/api/auth/logout",
+    summary="Logout user session",
+    tags=["auth"],
+)
+def logout_user() -> dict:
+    return {"success": True, "message": "Logged out successfully."}
+
+
+# ---------------------------------------------------------------------------
+# Complaint Endpoints
 # ---------------------------------------------------------------------------
 
 
@@ -116,12 +191,13 @@ async def custom_http_exception_handler(request: Request, exc: StarletteHTTPExce
     summary="Submit a new civic complaint",
     tags=["complaints"],
 )
-def submit_complaint(req: SubmitComplaintIn) -> SubmitComplaintResponse:
+def submit_complaint(
+    req: SubmitComplaintIn,
+    current_user: dict | None = Depends(get_optional_user),
+) -> SubmitComplaintResponse:
     """
     Classify complaint text with Gemini and persist the result.
-
-    Falls back to MockClassifier when GEMINI_API_KEY is absent or
-    USE_MOCK_CLASSIFIER=true.
+    Automatically assigns ownership to authenticated citizen user.
     """
     classifier = make_classifier()
     try:
@@ -151,6 +227,8 @@ def submit_complaint(req: SubmitComplaintIn) -> SubmitComplaintResponse:
     is_spam = classification.is_spam or classification.category.value == "Spam / Invalid"
     status = "Rejected / Spam" if is_spam else "New"
 
+    citizen_id = current_user["id"] if current_user else None
+
     # Check for duplicate open complaints at the same landmark / pincode / location & category
     is_duplicate = False
     duplicate_of_id = None
@@ -168,7 +246,7 @@ def submit_complaint(req: SubmitComplaintIn) -> SubmitComplaintResponse:
                 is_duplicate = True
                 duplicate_of_id = matching_cand["id"]
 
-    # If duplicate, MERGE into the original complaint and escalate support count & priority
+    # If duplicate, MERGE into original complaint and escalate support count & priority
     if is_duplicate and duplicate_of_id:
         merged_row = db.merge_duplicate_into_original(
             original_id=duplicate_of_id,
@@ -193,6 +271,7 @@ def submit_complaint(req: SubmitComplaintIn) -> SubmitComplaintResponse:
         affected_facility=classification.affected_facility,
         summary=classification.summary,
         status=status,
+        citizen_id=citizen_id,
         latitude=req.latitude,
         longitude=req.longitude,
         image_url=req.image_b64 if req.image_b64 else None,
@@ -256,7 +335,7 @@ def _clean_complaint(row: dict) -> ComplaintOut:
 
         # Remove None values for string fields so Pydantic schema defaults kick in
         for k in list(cleaned.keys()):
-            if cleaned[k] is None and k not in ("latitude", "longitude", "image_url", "image_analysis", "duplicate_of_id"):
+            if cleaned[k] is None and k not in ("citizen_id", "latitude", "longitude", "image_url", "image_analysis", "duplicate_of_id"):
                 del cleaned[k]
 
         return ComplaintOut(**cleaned)
@@ -264,6 +343,7 @@ def _clean_complaint(row: dict) -> ComplaintOut:
         logger.warning("Failed to clean complaint row %s: %s", row.get("id"), exc)
         return ComplaintOut(
             id=str(row.get("id", "COMP-2026-0000")),
+            citizen_id=row.get("citizen_id"),
             raw_text=str(row.get("raw_text", "")),
             category=str(row.get("category", "Other")),
             subcategory=str(row.get("subcategory", "General Civic Issue")),
@@ -289,7 +369,7 @@ def _to_list(val: list[str] | str | None) -> list[str] | None:
 @app.get(
     "/api/complaints",
     response_model=ListComplaintsResponse,
-    summary="List complaints with filtering, sorting, and pagination",
+    summary="List complaints with role-based scoping, filtering, and pagination",
     tags=["complaints"],
 )
 def list_complaints(
@@ -301,7 +381,20 @@ def list_complaints(
     sort: str = Query("newest", description="newest|oldest|highest_severity|highest_urgency"),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
+    current_user: dict | None = Depends(get_optional_user),
 ) -> ListComplaintsResponse:
+    filter_citizen_id = None
+    filter_department = None
+    filter_ward = None
+
+    if current_user:
+        role = current_user.get("role", "CITIZEN").upper()
+        if role == "CITIZEN":
+            filter_citizen_id = current_user["id"]
+        elif role == "OFFICER":
+            filter_department = current_user.get("department")
+            filter_ward = current_user.get("ward")
+
     rows, total = db.list_complaints(
         status=_to_list(status),
         category=_to_list(category),
@@ -311,6 +404,9 @@ def list_complaints(
         sort=sort,
         skip=skip,
         limit=limit,
+        citizen_id=filter_citizen_id,
+        officer_department=filter_department,
+        officer_ward=filter_ward,
     )
     return ListComplaintsResponse(
         complaints=[_clean_complaint(r) for r in rows],
@@ -321,13 +417,41 @@ def list_complaints(
 @app.get(
     "/api/complaints/{complaint_id}",
     response_model=ComplaintOut,
-    summary="Get complaint by ID",
+    summary="Get complaint by ID with server-side authorization check",
     tags=["complaints"],
 )
-def get_complaint(complaint_id: str) -> ComplaintOut:
+def get_complaint(
+    complaint_id: str,
+    current_user: dict | None = Depends(get_optional_user),
+) -> ComplaintOut:
     row = db.get_complaint(complaint_id)
     if not row:
         raise HTTPException(status_code=404, detail=f"Complaint '{complaint_id}' not found.")
+
+    if current_user:
+        role = current_user.get("role", "CITIZEN").upper()
+        if role == "CITIZEN":
+            if row.get("citizen_id") and row["citizen_id"] != current_user["id"]:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Access denied. You can only view complaints registered under your account.",
+                )
+        elif role == "OFFICER":
+            off_dep = current_user.get("department")
+            off_ward = current_user.get("ward")
+            comp_dep = row.get("department")
+            comp_ward = row.get("ward")
+            if off_dep and comp_dep and off_dep.lower() != comp_dep.lower():
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"Access denied. Complaint department ({comp_dep}) is outside your scope ({off_dep}).",
+                )
+            if off_ward and off_ward not in ("All", "") and comp_ward and off_ward.lower() != comp_ward.lower():
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"Access denied. Complaint ward ({comp_ward}) is outside your assigned ward ({off_ward}).",
+                )
+
     return _clean_complaint(row)
 
 
@@ -335,24 +459,46 @@ def get_complaint(complaint_id: str) -> ComplaintOut:
     "/api/complaints/{complaint_id}",
     methods=["PATCH", "PUT"],
     response_model=ComplaintOut,
-    summary="Update complaint status",
+    summary="Update complaint status (Officer/Admin only)",
     tags=["complaints"],
 )
-def update_complaint(complaint_id: str, req: UpdateStatusIn) -> ComplaintOut:
-    """Update the status of an existing complaint."""
-    try:
-        row = db.update_complaint_status(complaint_id, req.status)
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+def update_complaint(
+    complaint_id: str,
+    req: UpdateStatusIn,
+    current_user: dict = Depends(require_roles("OFFICER", "ADMIN")),
+) -> ComplaintOut:
+    """Update the status of an existing complaint with strict server-side state machine validation."""
+    row = db.get_complaint(complaint_id)
     if not row:
         raise HTTPException(status_code=404, detail=f"Complaint '{complaint_id}' not found.")
-    return _clean_complaint(row)
+
+    role = current_user.get("role", "OFFICER").upper()
+    if role == "OFFICER":
+        off_dep = current_user.get("department")
+        comp_dep = row.get("department")
+        if off_dep and comp_dep and off_dep.lower() != comp_dep.lower():
+            raise HTTPException(
+                status_code=403,
+                detail=f"Forbidden. You can only modify complaints in your department ({off_dep}).",
+            )
+
+    actor_name = f"{current_user.get('role', 'Officer')} ({current_user.get('name', 'User')})"
+    try:
+        updated_row = db.update_complaint_status(complaint_id, req.status, actor=actor_name)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return _clean_complaint(updated_row)
+
+
 @app.delete(
     "/api/complaints/{complaint_id}",
-    summary="Permanently delete complaint (Officer only)",
+    summary="Permanently delete complaint (Admin only)",
     tags=["complaints"],
 )
-def delete_complaint(complaint_id: str) -> dict:
+def delete_complaint(
+    complaint_id: str,
+    current_user: dict = Depends(require_roles("ADMIN")),
+) -> dict:
     """Physically remove a complaint entry."""
     success = db.delete_complaint(complaint_id)
     if not success:
@@ -363,19 +509,27 @@ def delete_complaint(complaint_id: str) -> dict:
 @app.post(
     "/api/officer/login",
     response_model=OfficerLoginOut,
-    summary="Authenticate Municipal Officer with ID and password",
+    summary="Legacy Municipal Officer login endpoint",
     tags=["officer"],
 )
 def officer_login(req: OfficerLoginIn) -> OfficerLoginOut:
-    profile = db.verify_officer_credentials(req.officer_id, req.password)
-    if not profile:
+    user = db.verify_user_credentials(req.officer_id, req.password)
+    if not user:
         raise HTTPException(status_code=401, detail="Invalid Officer ID or Password.")
+
+    token = create_access_token(
+        user_id=user["id"],
+        email=user["email"],
+        role=user["role"],
+        department=user.get("department"),
+        ward=user.get("ward"),
+    )
     return OfficerLoginOut(
         success=True,
-        officer_id=profile["officer_id"],
-        name=profile["name"],
-        department=profile["department"],
-        token=f"officer_token_{profile['officer_id']}",
+        officer_id=user["id"],
+        name=user["name"],
+        department=user.get("department") or "General",
+        token=token,
     )
 
 
@@ -385,7 +539,10 @@ def officer_login(req: OfficerLoginIn) -> OfficerLoginOut:
     summary="Change Municipal Officer password",
     tags=["officer"],
 )
-def change_password(req: ChangePasswordIn) -> ChangePasswordOut:
+def change_password(
+    req: ChangePasswordIn,
+    current_user: dict = Depends(get_current_user),
+) -> ChangePasswordOut:
     success = db.update_officer_password(req.officer_id, req.old_password, req.new_password)
     if not success:
         raise HTTPException(status_code=400, detail="Password change failed. Check your current password.")
@@ -473,17 +630,22 @@ def track_complaint(tracking_token: str) -> dict:
 @app.post(
     "/api/complaints/{complaint_id}/assign",
     response_model=ComplaintOut,
-    summary="Assign complaint to department, ward, and officer (Officer only)",
+    summary="Assign complaint to department, ward, and officer (Officer/Admin only)",
     tags=["lifecycle"],
 )
-def assign_complaint_endpoint(complaint_id: str, req: AssignComplaintIn) -> ComplaintOut:
+def assign_complaint_endpoint(
+    complaint_id: str,
+    req: AssignComplaintIn,
+    current_user: dict = Depends(require_roles("OFFICER", "ADMIN")),
+) -> ComplaintOut:
+    actor_name = f"{current_user.get('role', 'Officer')} ({current_user.get('name', 'User')})"
     row = db.assign_complaint(
         complaint_id=complaint_id,
         department=req.department,
         ward=req.ward,
         assigned_to=req.assigned_to,
         sla_hours=req.sla_hours,
-        actor="Officer",
+        actor=actor_name,
     )
     if not row:
         raise HTTPException(status_code=404, detail=f"Complaint '{complaint_id}' not found.")
@@ -493,15 +655,20 @@ def assign_complaint_endpoint(complaint_id: str, req: AssignComplaintIn) -> Comp
 @app.post(
     "/api/complaints/{complaint_id}/resolve",
     response_model=ComplaintOut,
-    summary="Submit resolution proof and mark as Resolved (Officer only)",
+    summary="Submit resolution proof and mark as Resolved (Officer/Admin only)",
     tags=["lifecycle"],
 )
-def resolve_complaint_endpoint(complaint_id: str, req: ResolveComplaintIn) -> ComplaintOut:
+def resolve_complaint_endpoint(
+    complaint_id: str,
+    req: ResolveComplaintIn,
+    current_user: dict = Depends(require_roles("OFFICER", "ADMIN")),
+) -> ComplaintOut:
+    actor_name = f"{current_user.get('role', 'Officer')} ({current_user.get('name', 'User')})"
     row = db.submit_resolution(
         complaint_id=complaint_id,
         note=req.note,
         evidence_image=req.evidence_image,
-        actor="Officer",
+        actor=actor_name,
     )
     if not row:
         raise HTTPException(status_code=404, detail=f"Complaint '{complaint_id}' not found.")
@@ -511,21 +678,41 @@ def resolve_complaint_endpoint(complaint_id: str, req: ResolveComplaintIn) -> Co
 @app.post(
     "/api/complaints/{complaint_id}/verify",
     response_model=ComplaintOut,
-    summary="Submit citizen verification feedback (Public/Citizen)",
+    summary="Submit citizen verification feedback (Original Citizen Owner only)",
     tags=["lifecycle"],
 )
-def verify_complaint_endpoint(complaint_id: str, req: VerifyComplaintIn) -> ComplaintOut:
+def verify_complaint_endpoint(
+    complaint_id: str,
+    req: VerifyComplaintIn,
+    current_user: dict = Depends(get_current_user),
+) -> ComplaintOut:
+    user_role = current_user.get("role", "CITIZEN").upper()
+    if user_role in ("OFFICER", "ADMIN"):
+        raise HTTPException(
+            status_code=403,
+            detail="Forbidden. Officers and Administrators cannot perform citizen resolution verification.",
+        )
+
+    row = db.get_complaint(complaint_id)
+    if not row:
+        raise HTTPException(status_code=404, detail=f"Complaint '{complaint_id}' not found.")
+
+    if row.get("citizen_id") and row["citizen_id"] != current_user["id"]:
+        raise HTTPException(
+            status_code=403,
+            detail="Forbidden. Only the original complaint owner can verify resolution satisfaction.",
+        )
+
     try:
-        row = db.verify_resolution(
+        updated_row = db.verify_resolution(
             complaint_id=complaint_id,
             result=req.result,
             feedback=req.feedback,
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    if not row:
-        raise HTTPException(status_code=404, detail=f"Complaint '{complaint_id}' not found.")
-    return _clean_complaint(row)
+
+    return _clean_complaint(updated_row)
 
 
 @app.get(
@@ -537,6 +724,74 @@ def verify_complaint_endpoint(complaint_id: str, req: VerifyComplaintIn) -> Comp
 def get_complaint_timeline_endpoint(complaint_id: str) -> list[TimelineEventOut]:
     events = db.get_complaint_events(complaint_id)
     return [TimelineEventOut(**e) for e in events]
+
+
+# ---------------------------------------------------------------------------
+# Admin User Management Endpoints
+# ---------------------------------------------------------------------------
+
+
+@app.get(
+    "/api/admin/users",
+    response_model=list[UserProfileOut],
+    summary="List all registered system users (Admin only)",
+    tags=["admin"],
+)
+def list_system_users(
+    role: str | None = Query(None, description="Optional role filter: CITIZEN|OFFICER|ADMIN"),
+    current_user: dict = Depends(require_roles("ADMIN")),
+) -> list[UserProfileOut]:
+    users = db.list_users(role=role)
+    return [UserProfileOut(**u) for u in users]
+
+
+@app.post(
+    "/api/admin/users",
+    response_model=UserProfileOut,
+    status_code=201,
+    summary="Create a new officer or user account (Admin only)",
+    tags=["admin"],
+)
+def admin_create_user(
+    req: UserAdminCreateIn,
+    current_user: dict = Depends(require_roles("ADMIN")),
+) -> UserProfileOut:
+    try:
+        user = db.create_user(
+            name=req.name,
+            email=req.email,
+            password=req.password,
+            role=req.role,
+            department=req.department,
+            ward=req.ward,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return UserProfileOut(**user)
+
+
+@app.patch(
+    "/api/admin/users/{user_id}",
+    response_model=UserProfileOut,
+    summary="Update user role, department, or ward assignment (Admin only)",
+    tags=["admin"],
+)
+def admin_update_user(
+    user_id: str,
+    req: UserAdminUpdateIn,
+    current_user: dict = Depends(require_roles("ADMIN")),
+) -> UserProfileOut:
+    updated = db.update_user(
+        user_id=user_id,
+        name=req.name,
+        role=req.role,
+        department=req.department,
+        ward=req.ward,
+        status=req.status,
+    )
+    if not updated:
+        raise HTTPException(status_code=404, detail=f"User '{user_id}' not found.")
+    return UserProfileOut(**updated)
 
 
 @app.get("/api/health", summary="Health check", tags=["system"])

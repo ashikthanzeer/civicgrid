@@ -21,8 +21,57 @@ class UpdateStatusIn(BaseModel):
     status: ComplaintStatusLiteral = Field(description="New complaint status")
 
 
+RoleLiteral = Literal["CITIZEN", "OFFICER", "ADMIN"]
+
+
+class UserRegisterIn(BaseModel):
+    name: str = Field(min_length=2, max_length=100, description="Full Name")
+    email: str = Field(min_length=5, max_length=150, description="Email address")
+    password: str = Field(min_length=6, max_length=100, description="Password")
+
+
+class UserLoginIn(BaseModel):
+    email: str = Field(min_length=1, description="Email address or Officer ID")
+    password: str = Field(min_length=1, description="Password")
+
+
+class UserProfileOut(BaseModel):
+    id: str
+    name: str
+    email: str
+    role: str
+    department: str | None = None
+    ward: str | None = None
+    status: str = "ACTIVE"
+    created_at: str = ""
+
+
+class AuthTokenOut(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserProfileOut
+
+
+class UserAdminCreateIn(BaseModel):
+    name: str = Field(min_length=2, max_length=100)
+    email: str = Field(min_length=5, max_length=150)
+    password: str = Field(min_length=6, max_length=100)
+    role: RoleLiteral = Field(default="OFFICER")
+    department: str | None = Field(default=None)
+    ward: str | None = Field(default=None)
+
+
+class UserAdminUpdateIn(BaseModel):
+    name: str | None = Field(default=None)
+    role: RoleLiteral | None = Field(default=None)
+    department: str | None = Field(default=None)
+    ward: str | None = Field(default=None)
+    status: str | None = Field(default=None)
+
+
 class ComplaintOut(BaseModel):
     id: str
+    citizen_id: str | None = None
     raw_text: str = ""
     category: str = "Other"
     subcategory: str = "General Civic Issue"

@@ -32,9 +32,16 @@ def fresh_db():
     # Teardown: delete all rows so tests are isolated
     import sqlite3
     conn = sqlite3.connect(os.environ["CIVICGRID_DB_PATH"])
-    conn.execute("DELETE FROM complaints")
-    conn.commit()
-    conn.close()
+    try:
+        conn.execute("DELETE FROM complaint_events")
+        conn.execute("DELETE FROM resolutions")
+        conn.execute("DELETE FROM citizen_verifications")
+        conn.execute("DELETE FROM complaints")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass
+    finally:
+        conn.close()
 
 
 client = TestClient(app)
@@ -134,19 +141,32 @@ def test_get_complaint_not_found_returns_404():
 # Update status
 # ---------------------------------------------------------------------------
 
+from civicgrid.auth import create_access_token
+
+
+def _off_headers():
+    token = create_access_token("OFFICER-2026", "officer1@civicgrid.gov.in", "OFFICER", "Municipal Public Works", "Ward 12")
+    return {"Authorization": f"Bearer {token}"}
+
+
+def _cit_headers(user_id="USER-CITIZEN-001"):
+    token = create_access_token(user_id, "citizen.a@example.com", "CITIZEN")
+    return {"Authorization": f"Bearer {token}"}
+
+
 def test_update_status():
     submit = client.post("/api/complaints", json={"text": "Broken drain cover flooding our street every time it rains.", "location": "Ward 6"})
     complaint_id = submit.json()["complaint"]["id"]
 
-    r1 = client.patch(f"/api/complaints/{complaint_id}", json={"status": "Under Review"})
+    r1 = client.patch(f"/api/complaints/{complaint_id}", json={"status": "Under Review"}, headers=_off_headers())
     assert r1.status_code == 200
     assert r1.json()["status"] == "Under Review"
 
-    r2 = client.patch(f"/api/complaints/{complaint_id}", json={"status": "Assigned"})
+    r2 = client.patch(f"/api/complaints/{complaint_id}", json={"status": "Assigned"}, headers=_off_headers())
     assert r2.status_code == 200
     assert r2.json()["status"] == "Assigned"
 
-    r3 = client.patch(f"/api/complaints/{complaint_id}", json={"status": "In Progress"})
+    r3 = client.patch(f"/api/complaints/{complaint_id}", json={"status": "In Progress"}, headers=_off_headers())
     assert r3.status_code == 200
     assert r3.json()["status"] == "In Progress"
 
@@ -155,12 +175,12 @@ def test_update_status_invalid_returns_422():
     submit = client.post("/api/complaints", json={"text": "No water supply in our area for the last two days.", "location": "Ward 10"})
     complaint_id = submit.json()["complaint"]["id"]
 
-    r = client.patch(f"/api/complaints/{complaint_id}", json={"status": "InvalidStatus"})
+    r = client.patch(f"/api/complaints/{complaint_id}", json={"status": "InvalidStatus"}, headers=_off_headers())
     assert r.status_code == 422
 
 
 def test_update_status_not_found_returns_404():
-    r = client.patch("/api/complaints/DOES-NOT-EXIST", json={"status": "Resolved"})
+    r = client.patch("/api/complaints/DOES-NOT-EXIST", json={"status": "Resolved"}, headers=_off_headers())
     assert r.status_code == 404
 
 
@@ -244,6 +264,7 @@ def test_assign_complaint_endpoint():
     assign_res = client.post(
         f"/api/complaints/{cid}/assign",
         json={"department": "Water Supply", "ward": "Ward 2", "assigned_to": "Officer K. Varma", "sla_hours": 48},
+        headers=_off_headers(),
     )
     assert assign_res.status_code == 200
     assigned = assign_res.json()
@@ -253,16 +274,18 @@ def test_assign_complaint_endpoint():
 
 
 def test_resolve_and_verify_complaint_flow():
-    r = client.post("/api/complaints", json={"text": "Garbage dump cleared request in sector 3.", "location": "Ward 3"})
+    cit_h = _cit_headers("USER-CITIZEN-001")
+    r = client.post("/api/complaints", json={"text": "Garbage dump cleared request in sector 3.", "location": "Ward 3"}, headers=cit_h)
     cid = r.json()["complaint"]["id"]
 
     # Must be assigned / in progress first before resolving according to state machine rules
-    client.post(f"/api/complaints/{cid}/assign", json={"department": "Sanitation", "assigned_to": "Officer A"})
-    client.patch(f"/api/complaints/{cid}", json={"status": "In Progress"})
+    client.post(f"/api/complaints/{cid}/assign", json={"department": "Sanitation", "assigned_to": "Officer A"}, headers=_off_headers())
+    client.patch(f"/api/complaints/{cid}", json={"status": "In Progress"}, headers=_off_headers())
 
     resolve_res = client.post(
         f"/api/complaints/{cid}/resolve",
         json={"note": "Cleaned up garbage using excavator and disinfected area.", "evidence_image": "https://example.com/proof.jpg"},
+        headers=_off_headers(),
     )
     assert resolve_res.status_code == 200
     assert resolve_res.json()["status"] == "Resolved"
@@ -270,6 +293,7 @@ def test_resolve_and_verify_complaint_flow():
     verify_res = client.post(
         f"/api/complaints/{cid}/verify",
         json={"result": "Verified", "feedback": "Area is clean now. Great job!"},
+        headers=cit_h,
     )
     assert verify_res.status_code == 200
     assert verify_res.json()["status"] == "Resolved"
@@ -287,16 +311,17 @@ def test_state_machine_invalid_transition_rejected():
     cid = r.json()["complaint"]["id"]
 
     # Direct transition from New -> Resolved without assignment or in progress is forbidden
-    bad_res = client.patch(f"/api/complaints/{cid}", json={"status": "Resolved"})
+    bad_res = client.patch(f"/api/complaints/{cid}", json={"status": "Resolved"}, headers=_off_headers())
     assert bad_res.status_code == 422
 
 
 def test_verification_only_allowed_on_resolved():
-    r = client.post("/api/complaints", json={"text": "Streetlight broken on 4th cross avenue.", "location": "Ward 1"})
+    cit_h = _cit_headers("USER-CITIZEN-001")
+    r = client.post("/api/complaints", json={"text": "Streetlight broken on 4th cross avenue.", "location": "Ward 1"}, headers=cit_h)
     cid = r.json()["complaint"]["id"]
 
     # Verification on New complaint should fail
-    bad_verify = client.post(f"/api/complaints/{cid}/verify", json={"result": "Verified"})
+    bad_verify = client.post(f"/api/complaints/{cid}/verify", json={"result": "Verified"}, headers=cit_h)
     assert bad_verify.status_code == 422
 
 
