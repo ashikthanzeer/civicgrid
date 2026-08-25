@@ -30,8 +30,6 @@ CREATE TABLE IF NOT EXISTS users (
     status        TEXT NOT NULL DEFAULT 'ACTIVE',
     created_at    TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
-CREATE INDEX IF NOT EXISTS idx_users_role  ON users(role);
 
 CREATE TABLE IF NOT EXISTS complaints (
     id                TEXT PRIMARY KEY,
@@ -63,10 +61,6 @@ CREATE TABLE IF NOT EXISTS complaints (
     resolved_at       TEXT,
     tracking_token    TEXT
 );
-CREATE INDEX IF NOT EXISTS idx_complaints_status   ON complaints(status);
-CREATE INDEX IF NOT EXISTS idx_complaints_category ON complaints(category);
-CREATE INDEX IF NOT EXISTS idx_complaints_created  ON complaints(created_at);
-CREATE INDEX IF NOT EXISTS idx_complaints_citizen  ON complaints(citizen_id);
 
 CREATE TABLE IF NOT EXISTS officers (
     officer_id    TEXT PRIMARY KEY,
@@ -84,7 +78,6 @@ CREATE TABLE IF NOT EXISTS complaint_events (
     timestamp     TEXT NOT NULL,
     metadata      TEXT
 );
-CREATE INDEX IF NOT EXISTS idx_complaint_events_cid ON complaint_events(complaint_id);
 
 CREATE TABLE IF NOT EXISTS resolutions (
     complaint_id   TEXT PRIMARY KEY,
@@ -100,6 +93,16 @@ CREATE TABLE IF NOT EXISTS citizen_verifications (
     timestamp    TEXT NOT NULL
 );
 """
+
+_CREATE_INDEXES_SQL = [
+    "CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);",
+    "CREATE INDEX IF NOT EXISTS idx_users_role  ON users(role);",
+    "CREATE INDEX IF NOT EXISTS idx_complaints_status   ON complaints(status);",
+    "CREATE INDEX IF NOT EXISTS idx_complaints_category ON complaints(category);",
+    "CREATE INDEX IF NOT EXISTS idx_complaints_created  ON complaints(created_at);",
+    "CREATE INDEX IF NOT EXISTS idx_complaints_citizen  ON complaints(citizen_id);",
+    "CREATE INDEX IF NOT EXISTS idx_complaint_events_cid ON complaint_events(complaint_id);",
+]
 
 VALID_STATUSES: frozenset[str] = frozenset(
     {"New", "Under Review", "Assigned", "In Progress", "Resolved", "Rejected / Spam"}
@@ -212,6 +215,8 @@ def init_db() -> None:
                     cur.execute("ALTER TABLE complaints ADD COLUMN IF NOT EXISTS sla_deadline TEXT;")
                     cur.execute("ALTER TABLE complaints ADD COLUMN IF NOT EXISTS resolved_at TEXT;")
                     cur.execute("ALTER TABLE complaints ADD COLUMN IF NOT EXISTS tracking_token TEXT;")
+                    for idx_sql in _CREATE_INDEXES_SQL:
+                        cur.execute(idx_sql)
                     _seed_initial_users(cur, is_pg=True)
                 conn.commit()
         else:
@@ -229,6 +234,11 @@ def init_db() -> None:
                 for col in cols:
                     try:
                         conn.execute(f"ALTER TABLE complaints ADD COLUMN {col}")
+                    except sqlite3.OperationalError:
+                        pass
+                for idx_sql in _CREATE_INDEXES_SQL:
+                    try:
+                        conn.execute(idx_sql)
                     except sqlite3.OperationalError:
                         pass
                 _seed_initial_users(conn, is_pg=False)
