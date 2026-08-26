@@ -42,6 +42,7 @@ export interface TranslationDictionary {
     analytics: string;
     complaints: string;
     map: string;
+    publicTracker: string;
     settings: string;
     brandSubtitle: string;
   };
@@ -213,6 +214,23 @@ export interface TranslationDictionary {
     trustTitle: string;
     trustDesc: string;
     storageNotice: string;
+    citizenAccountTitle: string;
+    citizenRoleLabel: string;
+    citizenPortalLink: string;
+    signOut: string;
+    changePasswordTitle: string;
+    currentPassword: string;
+    newPassword: string;
+    newPasswordPlaceholder: string;
+    confirmPassword: string;
+    confirmPasswordPlaceholder: string;
+    errorFillBoth: string;
+    errorMinChar: string;
+    errorMismatch: string;
+    successPasswordChange: string;
+    errorChangeFailed: string;
+    updatingPassword: string;
+    updatePasswordBtn: string;
   };
   officer: {
     signInTitle: string;

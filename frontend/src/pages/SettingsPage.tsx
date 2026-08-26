@@ -178,59 +178,7 @@ const AccountCard: React.FC = () => {
 
   // ── CITIZEN ───────────────────────────────────────────────────────────────
   if (isCitizen) {
-    return (
-      <div className="surface-card p-6 md:col-span-2">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-primary)' }}>
-              Citizen Account
-            </p>
-            <h2 className="mt-2 text-lg font-semibold" style={{ color: 'var(--color-text)' }}>
-              {user.name}
-            </h2>
-          </div>
-          <UserCheck className="h-5 w-5 shrink-0" style={{ color: 'var(--color-primary)' }} />
-        </div>
-
-        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-          <div>
-            <span className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--color-muted)' }}>
-              Email
-            </span>
-            <span style={{ color: 'var(--color-text)' }}>{user.email}</span>
-          </div>
-          <div>
-            <span className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--color-muted)' }}>
-              Role
-            </span>
-            <span
-              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold"
-              style={{ backgroundColor: 'color-mix(in srgb, var(--color-primary) 15%, transparent)', color: 'var(--color-primary)' }}
-            >
-              <User className="h-3 w-3" /> Citizen
-            </span>
-          </div>
-        </div>
-
-        <div className="mt-5 flex gap-3">
-          <Link
-            to="/citizen"
-            className="btn-primary text-xs py-2 px-4 inline-flex items-center gap-1.5 no-underline"
-          >
-            <UserCheck className="h-4 w-4" />
-            Go to My Portal
-          </Link>
-          <button
-            type="button"
-            onClick={logout}
-            className="rounded-[var(--radius)] border px-4 py-2 text-xs font-semibold transition-opacity hover:opacity-80"
-            style={{ borderColor: 'var(--color-border)', color: 'var(--color-muted)', backgroundColor: 'var(--color-background)' }}
-          >
-            Sign Out
-          </button>
-        </div>
-      </div>
-    );
+    return <CitizenAccountCard />;
   }
 
   // ── OFFICER ───────────────────────────────────────────────────────────────
@@ -297,6 +245,182 @@ const AccountCard: React.FC = () => {
   }
 
   return null;
+};
+
+/** Citizen-specific: show profile + change password form */
+const CitizenAccountCard: React.FC = () => {
+  const { t } = useI18n();
+  const { user, logout, changeUserPassword } = useRole();
+  const [oldPassword, setOldPassword] = React.useState('');
+  const [newPassword, setNewPassword] = React.useState('');
+  const [confirmPassword, setConfirmPassword] = React.useState('');
+  const [message, setMessage] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+  const [loading, setLoading] = React.useState(false);
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!oldPassword || !newPassword) {
+      setError(t.settings.errorFillBoth);
+      return;
+    }
+    if (newPassword.length < 6) {
+      setError(t.settings.errorMinChar);
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError(t.settings.errorMismatch);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    setMessage(null);
+
+    const res = await changeUserPassword(oldPassword, newPassword);
+    setLoading(false);
+
+    if (res.success) {
+      setMessage(res.message || t.settings.successPasswordChange);
+      setOldPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } else {
+      setError(res.error || t.settings.errorChangeFailed);
+    }
+  };
+
+  return (
+    <div className="surface-card p-6 md:col-span-2">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-primary)' }}>
+            {t.settings.citizenAccountTitle}
+          </p>
+          <h2 className="mt-2 text-lg font-semibold" style={{ color: 'var(--color-text)' }}>
+            {user?.name}
+          </h2>
+        </div>
+        <UserCheck className="h-5 w-5 shrink-0" style={{ color: 'var(--color-primary)' }} />
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+        <div>
+          <span className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--color-muted)' }}>
+            Email
+          </span>
+          <span style={{ color: 'var(--color-text)' }}>{user?.email}</span>
+        </div>
+        <div>
+          <span className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--color-muted)' }}>
+            Role
+          </span>
+          <span
+            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold"
+            style={{ backgroundColor: 'color-mix(in srgb, var(--color-primary) 15%, transparent)', color: 'var(--color-primary)' }}
+          >
+            <User className="h-3 w-3" /> {t.settings.citizenRoleLabel}
+          </span>
+        </div>
+      </div>
+
+      <div className="mt-5 flex gap-3">
+        <Link
+          to="/citizen"
+          className="btn-primary text-xs py-2 px-4 inline-flex items-center gap-1.5 no-underline"
+        >
+          <UserCheck className="h-4 w-4" />
+          {t.settings.citizenPortalLink}
+        </Link>
+        <button
+          type="button"
+          onClick={logout}
+          className="rounded-[var(--radius)] border px-4 py-2 text-xs font-semibold transition-opacity hover:opacity-80"
+          style={{ borderColor: 'var(--color-border)', color: 'var(--color-muted)', backgroundColor: 'var(--color-background)' }}
+        >
+          {t.settings.signOut}
+        </button>
+      </div>
+
+      <div className="mt-6 border-t pt-6" style={{ borderColor: 'var(--color-border)' }}>
+        <p className="text-sm font-semibold mb-4" style={{ color: 'var(--color-text)' }}>
+          {t.settings.changePasswordTitle}
+        </p>
+        <form onSubmit={handleChangePassword} className="max-w-lg space-y-4">
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--color-muted)' }}>
+              {t.settings.currentPassword}
+            </label>
+            <input
+              type="password"
+              value={oldPassword}
+              onChange={(e) => setOldPassword(e.target.value)}
+              placeholder="Current password"
+              className="w-full rounded-lg border py-2 px-3 text-sm"
+              style={{
+                borderColor: 'var(--color-border)',
+                backgroundColor: 'var(--color-background)',
+                color: 'var(--color-text)',
+              }}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--color-muted)' }}>
+                {t.settings.newPassword}
+              </label>
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder={t.settings.newPasswordPlaceholder}
+                className="w-full rounded-lg border py-2 px-3 text-sm"
+                style={{
+                  borderColor: 'var(--color-border)',
+                  backgroundColor: 'var(--color-background)',
+                  color: 'var(--color-text)',
+                }}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--color-muted)' }}>
+                {t.settings.confirmPassword}
+              </label>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder={t.settings.confirmPasswordPlaceholder}
+                className="w-full rounded-lg border py-2 px-3 text-sm"
+                style={{
+                  borderColor: 'var(--color-border)',
+                  backgroundColor: 'var(--color-background)',
+                  color: 'var(--color-text)',
+                }}
+              />
+            </div>
+          </div>
+
+          {error && (
+            <p className="text-xs font-medium" style={{ color: 'var(--color-danger)' }}>
+              {error}
+            </p>
+          )}
+
+          {message && (
+            <p className="text-xs font-medium" style={{ color: 'var(--color-success)' }}>
+              {message}
+            </p>
+          )}
+
+          <button type="submit" disabled={loading} className="btn-primary text-xs py-2 px-4">
+            {loading ? t.settings.updatingPassword : t.settings.updatePasswordBtn}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
 };
 
 /** Officer-specific: show profile + change password form */

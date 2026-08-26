@@ -257,6 +257,82 @@ def test_tracking_token_generated_and_track_endpoint():
     assert track_body["events"][0]["event_type"] == "CREATED"
 
 
+def test_track_endpoint_accepts_complaint_id():
+    r = client.post("/api/complaints", json={"text": "Broken pavement slabs outside the clinic entrance.", "location": "Ward 4"})
+    assert r.status_code == 201
+    complaint = r.json()["complaint"]
+
+    track_res = client.get(f"/api/complaints/track/{complaint['id']}")
+    assert track_res.status_code == 200
+    assert track_res.json()["complaint"]["id"] == complaint["id"]
+
+
+def test_track_endpoint_rejects_under_review_complaint():
+    r = client.post("/api/complaints", json={"text": "Loose electric cable hanging near the bus stop.", "location": "Ward 12"})
+    assert r.status_code == 201
+    complaint_id = r.json()["complaint"]["id"]
+
+    update_res = client.patch(
+        f"/api/complaints/{complaint_id}",
+        json={"status": "Under Review"},
+        headers=_off_headers(),
+    )
+    assert update_res.status_code == 200
+
+    track_res = client.get(f"/api/complaints/track/{complaint_id}")
+    assert track_res.status_code == 403
+
+
+def test_citizen_can_change_password():
+    user = db.create_user(
+        name="Password Test Citizen",
+        email="password-test-citizen@example.com",
+        password="oldpass123",
+        role="CITIZEN",
+    )
+    headers = {
+        "Authorization": f"Bearer {create_access_token(user['id'], user['email'], 'CITIZEN')}"
+    }
+
+    res = client.post(
+        "/api/auth/change-password",
+        json={"old_password": "oldpass123", "new_password": "newpass123"},
+        headers=headers,
+    )
+    assert res.status_code == 200
+    assert db.verify_user_credentials(user["email"], "newpass123")
+    assert not db.verify_user_credentials(user["email"], "oldpass123")
+
+
+def test_citizen_change_password_rejects_wrong_current_password():
+    user = db.create_user(
+        name="Password Failure Citizen",
+        email="password-failure-citizen@example.com",
+        password="oldpass123",
+        role="CITIZEN",
+    )
+    headers = {
+        "Authorization": f"Bearer {create_access_token(user['id'], user['email'], 'CITIZEN')}"
+    }
+
+    res = client.post(
+        "/api/auth/change-password",
+        json={"old_password": "wrongpass", "new_password": "newpass123"},
+        headers=headers,
+    )
+    assert res.status_code == 400
+    assert db.verify_user_credentials(user["email"], "oldpass123")
+
+
+def test_auth_change_password_is_citizen_only():
+    res = client.post(
+        "/api/auth/change-password",
+        json={"old_password": "password123", "new_password": "newpass123"},
+        headers=_off_headers(),
+    )
+    assert res.status_code == 403
+
+
 def test_assign_complaint_endpoint():
     r = client.post("/api/complaints", json={"text": "Water leakage from overhead tank near school.", "location": "Ward 2"})
     cid = r.json()["complaint"]["id"]
@@ -341,7 +417,6 @@ def test_sla_breach_detection_and_escalation():
     )
     breaches = db.process_sla_breaches()
     assert breaches >= 1
-
 
 
 

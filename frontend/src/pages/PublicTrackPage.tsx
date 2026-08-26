@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { trackComplaintByToken } from '../api/complaints';
+import { trackComplaintByIdentifier } from '../api/complaints';
 import { TimelineWidget } from '../components/TimelineWidget';
 import { CitizenVerificationCard } from '../components/CitizenVerificationCard';
 import type { TrackingData } from '../types/complaint';
@@ -9,21 +9,21 @@ export const PublicTrackPage: React.FC = () => {
   const { token: urlToken } = useParams<{ token?: string }>();
   const navigate = useNavigate();
 
-  const [inputToken, setInputToken] = useState(urlToken || '');
+  const [inputIdentifier, setInputIdentifier] = useState(urlToken || '');
   const [data, setData] = useState<TrackingData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const fetchTracking = async (searchToken: string) => {
-    if (!searchToken.trim()) return;
+  const fetchTracking = async (searchIdentifier: string) => {
+    if (!searchIdentifier.trim()) return;
     setLoading(true);
     setError(null);
     try {
-      const result = await trackComplaintByToken(searchToken.trim());
+      const result = await trackComplaintByIdentifier(searchIdentifier.trim());
       setData(result);
     } catch (err: any) {
-      setError(err?.message || 'Invalid or expired tracking token.');
+      setError(err?.message || 'No public complaint record found for that token or complaint ID.');
       setData(null);
     } finally {
       setLoading(false);
@@ -32,16 +32,16 @@ export const PublicTrackPage: React.FC = () => {
 
   useEffect(() => {
     if (urlToken) {
-      setInputToken(urlToken);
+      setInputIdentifier(urlToken);
       fetchTracking(urlToken);
     }
   }, [urlToken]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (inputToken.trim()) {
-      navigate(`/track/${encodeURIComponent(inputToken.trim())}`);
-      fetchTracking(inputToken.trim());
+    if (inputIdentifier.trim()) {
+      navigate(`/public-tracker/${encodeURIComponent(inputIdentifier.trim())}`);
+      fetchTracking(inputIdentifier.trim());
     }
   };
 
@@ -83,7 +83,7 @@ export const PublicTrackPage: React.FC = () => {
             <div>
               <h1 className="text-xl font-bold text-slate-100">Public Grievance Tracker</h1>
               <p className="text-xs text-slate-400">
-                Track real-time resolution status and municipal workflow using your 12-character token.
+                Track a newly filed grievance using its complaint ID or public tracking token.
               </p>
             </div>
           </div>
@@ -91,9 +91,9 @@ export const PublicTrackPage: React.FC = () => {
           <form onSubmit={handleSearch} className="flex gap-2">
             <input
               type="text"
-              value={inputToken}
-              onChange={(e) => setInputToken(e.target.value)}
-              placeholder="Enter Tracking Token (e.g. TK-8F9A1B2C) or Complaint ID..."
+              value={inputIdentifier}
+              onChange={(e) => setInputIdentifier(e.target.value)}
+              placeholder="Enter Complaint ID (COMP-2026-0001) or Tracking Token..."
               className="flex-1 bg-[#0F1229] border border-[#2A2F5C] rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-amber-400 font-mono"
             />
             <button
@@ -138,7 +138,7 @@ export const PublicTrackPage: React.FC = () => {
             <div className="flex items-center justify-between bg-[#0F1229] border border-[#2A2F5C] rounded-xl p-3">
               <div className="text-xs text-slate-400 flex items-center gap-2">
                 <span>Secret Tracking Token:</span>
-                <span className="font-mono font-bold text-amber-300">{data.complaint.tracking_token || inputToken}</span>
+                <span className="font-mono font-bold text-amber-300">{data.complaint.tracking_token || inputIdentifier}</span>
               </div>
               <button
                 onClick={handleCopy}

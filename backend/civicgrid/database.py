@@ -218,6 +218,15 @@ def init_db() -> None:
                     for idx_sql in _CREATE_INDEXES_SQL:
                         cur.execute(idx_sql)
                     _seed_initial_users(cur, is_pg=True)
+
+                    # Enforce RLS for Postgres, remove permissive policies, and create explicit deny policies to satisfy linters
+                    for t in ["users", "complaints", "officers", "complaint_events", "resolutions", "citizen_verifications"]:
+                        cur.execute(f"ALTER TABLE {t} ENABLE ROW LEVEL SECURITY;")
+                        cur.execute(f"DROP POLICY IF EXISTS \"Enable insert access for all users\" ON {t};")
+                        cur.execute(f"DROP POLICY IF EXISTS \"Enable update access for all users\" ON {t};")
+                        cur.execute(f"DROP POLICY IF EXISTS \"Deny all public access\" ON {t};")
+                        cur.execute(f"CREATE POLICY \"Deny all public access\" ON {t} FOR ALL TO public USING (false);")
+
                 conn.commit()
         else:
             conn = _get_sqlite_conn()
@@ -487,9 +496,47 @@ def update_user(
     return res
 
 
+def update_user_password(user_id: str, old_password: str, new_password: str) -> bool:
+    """Verify the old password and update to the new password for any user role."""
+    user = get_user_by_id(user_id)
+    if not user or user.get("password_hash") != hash_password(old_password):
+        return False
+    new_hash = hash_password(new_password)
+    with _lock:
+        if _is_postgres():
+            with _get_pg_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "UPDATE users SET password_hash = %s WHERE id = %s",
+                        (new_hash, user_id),
+                    )
+                    # Also update officers table if user is an officer
+                    cur.execute(
+                        "UPDATE officers SET password_hash = %s WHERE officer_id = %s",
+                        (new_hash, user_id),
+                    )
+                conn.commit()
+        else:
+            conn = _get_sqlite_conn()
+            try:
+                conn.execute(
+                    "UPDATE users SET password_hash = ? WHERE id = ?",
+                    (new_hash, user_id),
+                )
+                conn.execute(
+                    "UPDATE officers SET password_hash = ? WHERE officer_id = ?",
+                    (new_hash, user_id),
+                )
+                conn.commit()
+            finally:
+                conn.close()
+    return True
+
+
 def generate_tracking_token() -> str:
     """Generate a unique 12-character public tracking token."""
     return f"TK-{secrets.token_hex(4).upper()}"
+
 
 
 def calculate_default_sla(severity: str, from_time: datetime | None = None) -> str:

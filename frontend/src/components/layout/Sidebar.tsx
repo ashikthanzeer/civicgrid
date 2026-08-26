@@ -9,6 +9,7 @@ import {
   Settings,
   Grid3X3,
   MapPinned,
+  Search,
   UserCheck,
   ShieldCheck,
   ShieldAlert,
@@ -42,6 +43,7 @@ export const navItemDefs: NavItemDef[] = [
   { key: 'analytics', path: '/analytics', label: 'AI Analytics',      icon: BarChart3,    end: false },
   { key: 'complaints',path: '/complaints',label: 'All Complaints',    icon: List,         end: false },
   { key: 'map',       path: '/map',       label: 'Grievance Map',     icon: MapPinned,    end: false },
+  { key: 'publicTracker', path: '/public-tracker', label: 'Public Grievance Tracker', icon: Search, end: false },
   { key: 'settings',  path: '/settings',  label: 'Settings',          icon: Settings,     end: false },
 ];
 

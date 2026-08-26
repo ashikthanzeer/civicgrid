@@ -203,6 +203,12 @@ class ChangePasswordOut(BaseModel):
     message: str
 
 
+class UserChangePasswordIn(BaseModel):
+    old_password: str = Field(min_length=1, description="Current password")
+    new_password: str = Field(min_length=6, description="New password (min 6 characters)")
+
+
+
 class TranslateTextIn(BaseModel):
     text: str = Field(min_length=1, max_length=3000, description="Source text to translate")
     target_language: str = Field(min_length=2, max_length=20, description="Target language code (e.g., hi, ml, ta, te, kn, bn, mr, en)")

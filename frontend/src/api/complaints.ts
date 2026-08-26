@@ -77,9 +77,11 @@ export const translateComplaintText = async (
   }
 };
 
-export const trackComplaintByToken = async (token: string): Promise<import('../types/complaint').TrackingData> => {
-  return apiClient<import('../types/complaint').TrackingData>(`/api/complaints/track/${encodeURIComponent(token)}`);
+export const trackComplaintByIdentifier = async (identifier: string): Promise<import('../types/complaint').TrackingData> => {
+  return apiClient<import('../types/complaint').TrackingData>(`/api/complaints/track/${encodeURIComponent(identifier)}`);
 };
+
+export const trackComplaintByToken = trackComplaintByIdentifier;
 
 export const assignComplaint = async (
   id: string,
@@ -143,6 +145,5 @@ export const updateAdminUser = async (
     body: JSON.stringify(data),
   });
 };
-
 
 

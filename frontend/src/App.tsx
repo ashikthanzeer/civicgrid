@@ -15,6 +15,7 @@ import SubmitComplaintPage from './pages/SubmitComplaintPage';
 import ComplaintDetailsPage from './pages/ComplaintDetailsPage';
 import MapPage from './pages/MapPage';
 import SettingsPage from './pages/SettingsPage';
+import { PublicTrackPage } from './pages/PublicTrackPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -110,6 +111,9 @@ function AppContent() {
               } />
               <Route path="/map" element={<MapPage />} />
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/public-tracker" element={<PublicTrackPage />} />
+              <Route path="/public-tracker/:token" element={<PublicTrackPage />} />
+              <Route path="/track/:token" element={<PublicTrackPage />} />
             </Route>
           </Routes>
         </BrowserRouter>

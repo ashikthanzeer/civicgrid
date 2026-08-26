@@ -40,6 +40,8 @@ interface RoleContextType {
   loginAsOfficer: (officerId: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logoutOfficer: () => void;
   changeOfficerPassword: (oldPassword: string, newPassword: string) => Promise<{ success: boolean; message?: string; error?: string }>;
+  changeUserPassword: (oldPassword: string, newPassword: string) => Promise<{ success: boolean; message?: string; error?: string }>;
+  changeCitizenPassword: (oldPassword: string, newPassword: string) => Promise<{ success: boolean; message?: string; error?: string }>;
 }
 
 const RoleContext = createContext<RoleContextType | undefined>(undefined);
@@ -214,6 +216,25 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const changeUserPassword = async (oldPassword: string, newPassword: string) => {
+    if (!user) return { success: false, error: 'Not authenticated' };
+
+    try {
+      await apiClient('/api/auth/change-password', {
+        method: 'POST',
+        body: JSON.stringify({
+          old_password: oldPassword,
+          new_password: newPassword,
+        }),
+      });
+      return { success: true, message: 'Password updated successfully!' };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Password update failed' };
+    }
+  };
+
+  const changeCitizenPassword = changeUserPassword;
+
   const officerProfile: OfficerProfile | null = user && user.role === 'OFFICER' ? {
     officer_id: user.id,
     name: user.name,
@@ -236,6 +257,8 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loginAsOfficer,
         logoutOfficer,
         changeOfficerPassword,
+        changeUserPassword,
+        changeCitizenPassword,
       }}
     >
       {children}

@@ -23,6 +23,7 @@ from .models import (
     OfficerLoginOut,
     ChangePasswordIn,
     ChangePasswordOut,
+    UserChangePasswordIn,
     TranslateTextIn,
     TranslateTextOut,
     AssignComplaintIn,
@@ -177,6 +178,29 @@ def get_me(current_user: dict = Depends(get_current_user)) -> UserProfileOut:
 )
 def logout_user() -> dict:
     return {"success": True, "message": "Logged out successfully."}
+
+
+@app.post(
+    "/api/auth/change-password",
+    response_model=ChangePasswordOut,
+    summary="Change citizen password",
+    tags=["auth"],
+)
+def change_user_password(
+    req: UserChangePasswordIn,
+    current_user: dict = Depends(get_current_user),
+) -> ChangePasswordOut:
+    """Validate old password and set a new password for the authenticated citizen."""
+    if current_user.get("role", "").upper() != "CITIZEN":
+        raise HTTPException(status_code=403, detail="Only citizens can use this endpoint.")
+    success = db.update_user_password(
+        user_id=current_user["id"],
+        old_password=req.old_password,
+        new_password=req.new_password,
+    )
+    if not success:
+        raise HTTPException(status_code=400, detail="Password change failed. Check your current password.")
+    return ChangePasswordOut(success=True, message="Password updated successfully.")
 
 
 # ---------------------------------------------------------------------------
@@ -604,15 +628,32 @@ async def tts_endpoint(text: str = Query(..., max_length=1000), lang: str = Quer
     raise HTTPException(status_code=502, detail="TTS service temporarily unavailable")
 
 
+# Statuses beyond which public (unauthenticated) tracking is restricted
+_RESTRICTED_STATUSES = frozenset(
+    {"Under Review", "Assigned", "In Progress", "Resolved", "Verified", "Reopened", "Rejected / Spam"}
+)
+
+
 @app.get(
-    "/api/complaints/track/{tracking_token}",
-    summary="Track complaint by public tracking token or ID",
+    "/api/complaints/track/{identifier}",
+    summary="Track complaint by public tracking token or complaint ID",
     tags=["tracking"],
 )
-def track_complaint(tracking_token: str) -> dict:
-    row = db.get_complaint_by_tracking_token(tracking_token)
+def track_complaint(identifier: str) -> dict:
+    """Look up a complaint by tracking token (TK-...) or complaint ID (COMP-...).
+    Public retrieval is restricted once the complaint progresses past 'New' status."""
+    row = db.get_complaint_by_tracking_token(identifier)
     if not row:
-        raise HTTPException(status_code=404, detail="Invalid or expired tracking token.")
+        raise HTTPException(status_code=404, detail="No complaint found for this token or ID.")
+
+    # Restrict public access once complaint moves past "New"
+    status = row.get("status", "New")
+    if status in _RESTRICTED_STATUSES:
+        raise HTTPException(
+            status_code=403,
+            detail=f"This complaint is now '{status}' and can no longer be publicly retrieved. "
+                   "Please log in to your citizen portal for updates.",
+        )
 
     complaint_id = row["id"]
     events = db.get_complaint_events(complaint_id)
@@ -797,5 +838,4 @@ def admin_update_user(
 @app.get("/api/health", summary="Health check", tags=["system"])
 def health() -> dict:
     return {"status": "ok", "version": "1.0.0"}
-
 
