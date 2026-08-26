@@ -38,10 +38,10 @@ export const navItemDefs: NavItemDef[] = [
   { key: 'submit',    path: '/submit',    label: 'File Grievance',    icon: FilePlus2,    end: false, roles: ['citizen'], authRequired: true },
   { key: 'officer',   path: '/officer',   label: 'Officer Desk',      icon: ShieldCheck,  end: false, roles: ['officer'], authRequired: true },
   { key: 'admin',     path: '/admin',     label: 'Admin Portal',      icon: ShieldAlert,  end: false, roles: ['admin'],   authRequired: true },
-  { key: 'dashboard', path: '/dashboard', label: 'Overview Dashboard',icon: LayoutDashboard, end: false, roles: ['officer', 'admin'], authRequired: true },
-  { key: 'analytics', path: '/analytics', label: 'AI Analytics',      icon: BarChart3,    end: false, roles: ['officer', 'admin'], authRequired: true },
-  { key: 'complaints',path: '/complaints',label: 'All Complaints',    icon: List,         end: false, roles: ['officer', 'admin'], authRequired: true },
-  { key: 'map',       path: '/map',       label: 'Grievance Map',     icon: MapPinned,    end: false, roles: ['officer', 'admin'], authRequired: true },
+  { key: 'dashboard', path: '/dashboard', label: 'Overview Dashboard',icon: LayoutDashboard, end: false },
+  { key: 'analytics', path: '/analytics', label: 'AI Analytics',      icon: BarChart3,    end: false },
+  { key: 'complaints',path: '/complaints',label: 'All Complaints',    icon: List,         end: false },
+  { key: 'map',       path: '/map',       label: 'Grievance Map',     icon: MapPinned,    end: false },
   { key: 'settings',  path: '/settings',  label: 'Settings',          icon: Settings,     end: false },
 ];
 

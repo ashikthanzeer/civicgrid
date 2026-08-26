@@ -31,6 +31,7 @@ import { LoginPage } from './pages/LoginPage';
 import { CitizenPortal } from './pages/CitizenPortal';
 import { OfficerPortal } from './pages/OfficerPortal';
 import { AdminPortal } from './pages/AdminPortal';
+import { ProtectedRoute } from './components/auth/ProtectedRoute';
 
 function AppContent() {
   const { isDark } = useTheme();
@@ -83,14 +84,30 @@ function AppContent() {
             <Route element={<AppShell />}>
               <Route path="/" element={<LandingPage />} />
               <Route path="/login" element={<LoginPage />} />
-              <Route path="/citizen" element={<CitizenPortal />} />
-              <Route path="/officer" element={<OfficerPortal />} />
-              <Route path="/admin" element={<AdminPortal />} />
+              <Route path="/citizen" element={
+                <ProtectedRoute allowedRoles={['citizen']}>
+                  <CitizenPortal />
+                </ProtectedRoute>
+              } />
+              <Route path="/officer" element={
+                <ProtectedRoute allowedRoles={['officer']}>
+                  <OfficerPortal />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin" element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <AdminPortal />
+                </ProtectedRoute>
+              } />
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/analytics" element={<AnalyticsPage />} />
               <Route path="/complaints" element={<ComplaintsPage />} />
               <Route path="/complaints/:id" element={<ComplaintDetailsPage />} />
-              <Route path="/submit" element={<SubmitComplaintPage />} />
+              <Route path="/submit" element={
+                <ProtectedRoute allowedRoles={['citizen']}>
+                  <SubmitComplaintPage />
+                </ProtectedRoute>
+              } />
               <Route path="/map" element={<MapPage />} />
               <Route path="/settings" element={<SettingsPage />} />
             </Route>
