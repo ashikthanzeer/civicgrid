@@ -185,6 +185,72 @@ def test_update_status_not_found_returns_404():
 
 
 # ---------------------------------------------------------------------------
+# Complaint deletion
+# ---------------------------------------------------------------------------
+
+def test_citizen_can_delete_own_new_complaint():
+    r = client.post(
+        "/api/complaints",
+        json={"text": "The streetlight outside my home is not working.", "location": "Ward 3"},
+        headers=_cit_headers(),
+    )
+    complaint_id = r.json()["complaint"]["id"]
+
+    delete_res = client.delete(f"/api/complaints/{complaint_id}", headers=_cit_headers())
+
+    assert delete_res.status_code == 200
+    assert client.get(f"/api/complaints/{complaint_id}").status_code == 404
+
+
+def test_citizen_cannot_delete_complaint_after_new_stage():
+    r = client.post(
+        "/api/complaints",
+        json={"text": "The streetlight outside my home is not working.", "location": "Ward 3"},
+        headers=_cit_headers(),
+    )
+    complaint_id = r.json()["complaint"]["id"]
+    assert client.patch(
+        f"/api/complaints/{complaint_id}",
+        json={"status": "Under Review"},
+        headers=_off_headers(),
+    ).status_code == 200
+
+    delete_res = client.delete(f"/api/complaints/{complaint_id}", headers=_cit_headers())
+
+    assert delete_res.status_code == 403
+    assert client.get(f"/api/complaints/{complaint_id}", headers=_cit_headers()).status_code == 200
+
+
+def test_citizen_cannot_delete_another_citizens_complaint():
+    r = client.post(
+        "/api/complaints",
+        json={"text": "The streetlight outside my home is not working.", "location": "Ward 3"},
+        headers=_cit_headers(),
+    )
+    complaint_id = r.json()["complaint"]["id"]
+
+    delete_res = client.delete(
+        f"/api/complaints/{complaint_id}",
+        headers=_cit_headers("USER-CITIZEN-002"),
+    )
+
+    assert delete_res.status_code == 403
+
+
+def test_public_tracking_is_unchanged_for_new_complaint():
+    r = client.post(
+        "/api/complaints",
+        json={"text": "The streetlight outside my home is not working.", "location": "Ward 3"},
+    )
+    complaint = r.json()["complaint"]
+
+    track_res = client.get(f"/api/complaints/track/{complaint['tracking_token']}")
+
+    assert track_res.status_code == 200
+    assert track_res.json()["complaint"]["id"] == complaint["id"]
+
+
+# ---------------------------------------------------------------------------
 # Stats
 # ---------------------------------------------------------------------------
 

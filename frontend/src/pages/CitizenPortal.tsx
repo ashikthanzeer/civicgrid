@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Card, Row, Col, Statistic, Table, Tag, Button, Tabs, Empty, Alert, Spin } from 'antd';
-import { FormOutlined, CheckCircleOutlined, ClockCircleOutlined, FileTextOutlined, ReloadOutlined, UserOutlined } from '@ant-design/icons';
+import { Card, Row, Col, Statistic, Table, Tag, Button, Tabs, Empty, Alert, Spin, Popconfirm } from 'antd';
+import { FormOutlined, CheckCircleOutlined, ClockCircleOutlined, FileTextOutlined, ReloadOutlined, UserOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, Link } from 'react-router-dom';
-import { getComplaints } from '../api/complaints';
+import { deleteComplaint, getComplaints } from '../api/complaints';
 import { useRole } from '../context/RoleContext';
 import type { Complaint } from '../types/complaint';
 import { CitizenVerificationCard } from '../components/CitizenVerificationCard';
@@ -12,6 +12,7 @@ export const CitizenPortal: React.FC = () => {
   const { user, isCitizen } = useRole();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<string>('my-complaints');
+  const [deletingComplaintId, setDeletingComplaintId] = useState<string | null>(null);
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['citizen-complaints', user?.id],
@@ -28,6 +29,18 @@ export const CitizenPortal: React.FC = () => {
   const pendingVerification = myComplaints.filter((c) => c.status === 'Resolved');
   const activeComplaints = myComplaints.filter((c) => ['New', 'Under Review', 'Assigned', 'In Progress', 'Reopened'].includes(c.status));
   const resolvedComplaints = myComplaints.filter((c) => c.status === 'Resolved');
+
+  const handleDeleteComplaint = async (id: string) => {
+    setDeletingComplaintId(id);
+    try {
+      await deleteComplaint(id);
+      await refetch();
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete complaint');
+    } finally {
+      setDeletingComplaintId(null);
+    }
+  };
 
   if (!user && !isCitizen) {
     return (
@@ -190,9 +203,28 @@ export const CitizenPortal: React.FC = () => {
                       title: 'Action',
                       key: 'action',
                       render: (_, record: Complaint) => (
-                        <Button type="link" onClick={() => navigate(`/complaints/${record.id}`)}>
-                          View Details
-                        </Button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <Button type="link" onClick={() => navigate(`/complaints/${record.id}`)}>
+                            View Details
+                          </Button>
+                          {record.status === 'New' && record.citizen_id === user?.id && (
+                            <Popconfirm
+                              title="Delete this complaint?"
+                              description="This cannot be undone."
+                              onConfirm={() => handleDeleteComplaint(record.id)}
+                              okText="Delete"
+                              okButtonProps={{ danger: true, loading: deletingComplaintId === record.id }}
+                            >
+                              <Button
+                                type="text"
+                                danger
+                                icon={<DeleteOutlined />}
+                                loading={deletingComplaintId === record.id}
+                                aria-label={`Delete complaint ${record.id}`}
+                              />
+                            </Popconfirm>
+                          )}
+                        </div>
                       ),
                     },
                   ]}

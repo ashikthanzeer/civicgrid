@@ -516,14 +516,27 @@ def update_complaint(
 
 @app.delete(
     "/api/complaints/{complaint_id}",
-    summary="Permanently delete complaint (Admin only)",
+    summary="Permanently delete complaint (Admin or owning Citizen before review)",
     tags=["complaints"],
 )
 def delete_complaint(
     complaint_id: str,
-    current_user: dict = Depends(require_roles("ADMIN")),
+    current_user: dict = Depends(get_current_user),
 ) -> dict:
-    """Physically remove a complaint entry."""
+    """Physically remove an admin complaint or an owning citizen's new complaint."""
+    row = db.get_complaint(complaint_id)
+    if not row:
+        raise HTTPException(status_code=404, detail=f"Complaint '{complaint_id}' not found.")
+
+    role = current_user.get("role", "CITIZEN").upper()
+    if role == "CITIZEN":
+        if row.get("citizen_id") != current_user["id"]:
+            raise HTTPException(status_code=403, detail="Forbidden. You can only delete your own complaints.")
+        if row.get("status") != "New":
+            raise HTTPException(status_code=403, detail="Forbidden. Complaints can only be deleted before review.")
+    elif role != "ADMIN":
+        raise HTTPException(status_code=403, detail="Access denied. Requires an Administrator or Citizen account.")
+
     success = db.delete_complaint(complaint_id)
     if not success:
         raise HTTPException(status_code=404, detail=f"Complaint '{complaint_id}' not found.")
