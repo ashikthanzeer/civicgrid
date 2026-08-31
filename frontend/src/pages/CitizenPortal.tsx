@@ -7,6 +7,7 @@ import { deleteComplaint, getComplaints } from '../api/complaints';
 import { useRole } from '../context/RoleContext';
 import type { Complaint } from '../types/complaint';
 import { CitizenVerificationCard } from '../components/CitizenVerificationCard';
+import { ComplaintCard } from '../components/complaints/ComplaintCard';
 
 export const CitizenPortal: React.FC = () => {
   const { user, isCitizen } = useRole();
@@ -148,87 +149,140 @@ export const CitizenPortal: React.FC = () => {
                   </Button>
                 </Empty>
               ) : (
-                <Table
-                  dataSource={myComplaints}
-                  rowKey="id"
-                  pagination={{ pageSize: 10 }}
-                  columns={[
-                    {
-                      title: 'Complaint ID',
-                      dataIndex: 'id',
-                      key: 'id',
-                      render: (id: string) => <Link to={`/complaints/${id}`} style={{ fontWeight: 600 }}>{id}</Link>,
-                    },
-                    {
-                      title: 'Summary',
-                      dataIndex: 'summary',
-                      key: 'summary',
-                      render: (text: string, record: Complaint) => text || record.raw_text.slice(0, 60) + '...',
-                    },
-                    {
-                      title: 'Category',
-                      dataIndex: 'category',
-                      key: 'category',
-                      render: (cat: string) => <Tag color="blue">{cat}</Tag>,
-                    },
-                    {
-                      title: 'Location',
-                      dataIndex: 'location',
-                      key: 'location',
-                    },
-                    {
-                      title: 'Status',
-                      dataIndex: 'status',
-                      key: 'status',
-                      render: (status: string) => {
-                        const colors: Record<string, string> = {
-                          New: 'blue',
-                          'Under Review': 'orange',
-                          Assigned: 'cyan',
-                          'In Progress': 'processing',
-                          Resolved: 'success',
-                          'Rejected / Spam': 'error',
-                          Reopened: 'warning',
-                        };
-                        return <Tag color={colors[status] || 'default'}>{status}</Tag>;
-                      },
-                    },
-                    {
-                      title: 'Submitted On',
-                      dataIndex: 'created_at',
-                      key: 'created_at',
-                      render: (d: string) => d ? new Date(d).toLocaleDateString() : 'N/A',
-                    },
-                    {
-                      title: 'Action',
-                      key: 'action',
-                      render: (_, record: Complaint) => (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <Button type="link" onClick={() => navigate(`/complaints/${record.id}`)}>
-                            View Details
-                          </Button>
-                          {record.status === 'New' && record.citizen_id === user?.id && (
-                            <Popconfirm
-                              title="Delete this complaint?"
-                              description="This cannot be undone."
-                              onConfirm={() => handleDeleteComplaint(record.id)}
-                              okText="Delete"
-                              okButtonProps={{ danger: true, loading: deletingComplaintId === record.id }}
-                            >
-                              <Button
-                                type="text"
-                                danger
-                                icon={<DeleteOutlined />}
-                                loading={deletingComplaintId === record.id}
-                                aria-label={`Delete complaint ${record.id}`}
-                              />
-                            </Popconfirm>
-                          )}
+                <>
+                  {/* Mobile: Horizontal scroll cards */}
+                  <div className="md:hidden">
+                    <div 
+                      className="complaints-scroll-container flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory"
+                      style={{
+                        scrollbarWidth: 'thin',
+                        WebkitOverflowScrolling: 'touch',
+                      }}
+                    >
+                      {myComplaints.map((complaint) => (
+                        <div 
+                          key={complaint.id}
+                          className="flex-shrink-0 snap-start"
+                          style={{ width: '300px' }}
+                        >
+                          <div className="relative">
+                            <ComplaintCard complaint={complaint} />
+                            {complaint.status === 'New' && complaint.citizen_id === user?.id && (
+                              <div className="absolute top-2 right-2">
+                                <Popconfirm
+                                  title="Delete this complaint?"
+                                  description="This cannot be undone."
+                                  onConfirm={() => handleDeleteComplaint(complaint.id)}
+                                  okText="Delete"
+                                  okButtonProps={{ danger: true, loading: deletingComplaintId === complaint.id }}
+                                >
+                                  <Button
+                                    type="text"
+                                    danger
+                                    icon={<DeleteOutlined />}
+                                    loading={deletingComplaintId === complaint.id}
+                                    size="small"
+                                    aria-label={`Delete complaint ${complaint.id}`}
+                                  />
+                                </Popconfirm>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      ),
-                    },
-                  ]}
-                />
+                      ))}
+                    </div>
+                    {myComplaints.length > 0 && (
+                      <div className="text-center mt-2 text-xs" style={{ color: 'var(--color-muted)' }}>
+                        ← Swipe to see more complaints →
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Desktop: Table view */}
+                  <div className="hidden md:block">
+                    <Table
+                      dataSource={myComplaints}
+                      rowKey="id"
+                      pagination={{ pageSize: 10 }}
+                      columns={[
+                        {
+                          title: 'Complaint ID',
+                          dataIndex: 'id',
+                          key: 'id',
+                          render: (id: string) => <Link to={`/complaints/${id}`} style={{ fontWeight: 600 }}>{id}</Link>,
+                        },
+                        {
+                          title: 'Summary',
+                          dataIndex: 'summary',
+                          key: 'summary',
+                          render: (text: string, record: Complaint) => text || record.raw_text.slice(0, 60) + '...',
+                        },
+                        {
+                          title: 'Category',
+                          dataIndex: 'category',
+                          key: 'category',
+                          render: (cat: string) => <Tag color="blue">{cat}</Tag>,
+                        },
+                        {
+                          title: 'Location',
+                          dataIndex: 'location',
+                          key: 'location',
+                        },
+                        {
+                          title: 'Status',
+                          dataIndex: 'status',
+                          key: 'status',
+                          render: (status: string) => {
+                            const colors: Record<string, string> = {
+                              New: 'blue',
+                              'Under Review': 'orange',
+                              Assigned: 'cyan',
+                              'In Progress': 'processing',
+                              Resolved: 'success',
+                              'Rejected / Spam': 'error',
+                              Reopened: 'warning',
+                            };
+                            return <Tag color={colors[status] || 'default'}>{status}</Tag>;
+                          },
+                        },
+                        {
+                          title: 'Submitted On',
+                          dataIndex: 'created_at',
+                          key: 'created_at',
+                          render: (d: string) => d ? new Date(d).toLocaleDateString() : 'N/A',
+                        },
+                        {
+                          title: 'Action',
+                          key: 'action',
+                          render: (_, record: Complaint) => (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <Button type="link" onClick={() => navigate(`/complaints/${record.id}`)}>
+                                View Details
+                              </Button>
+                              {record.status === 'New' && record.citizen_id === user?.id && (
+                                <Popconfirm
+                                  title="Delete this complaint?"
+                                  description="This cannot be undone."
+                                  onConfirm={() => handleDeleteComplaint(record.id)}
+                                  okText="Delete"
+                                  okButtonProps={{ danger: true, loading: deletingComplaintId === record.id }}
+                                >
+                                  <Button
+                                    type="text"
+                                    danger
+                                    icon={<DeleteOutlined />}
+                                    loading={deletingComplaintId === record.id}
+                                    aria-label={`Delete complaint ${record.id}`}
+                                  />
+                                </Popconfirm>
+                              )}
+                            </div>
+                          ),
+                        },
+                      ]}
+                    />
+                  </div>
+                </>
               ),
             },
             {

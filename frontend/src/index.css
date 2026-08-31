@@ -363,3 +363,22 @@
 html.dark .gm-style button.gm-ui-hover-effect span {
   background-color: var(--color-text) !important;
 }
+
+/* Custom scrollbar for horizontal scrolling */
+.complaints-scroll-container::-webkit-scrollbar {
+  height: 6px;
+}
+
+.complaints-scroll-container::-webkit-scrollbar-track {
+  background: var(--color-elevated);
+  border-radius: 3px;
+}
+
+.complaints-scroll-container::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+}
+
+.complaints-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: var(--color-muted);
+}
