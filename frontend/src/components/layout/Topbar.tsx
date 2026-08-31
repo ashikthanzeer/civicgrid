@@ -90,7 +90,7 @@ export const Topbar: React.FC<TopbarProps> = ({ onMenuClick, menuOpen = false })
           <div className="flex items-center gap-1.5">
             <Link
               to={role === 'admin' ? '/admin' : role === 'officer' ? '/officer' : '/citizen'}
-              className="inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1 text-xs font-bold no-underline"
+              className="hidden sm:inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1 text-xs font-bold no-underline"
               style={{
                 borderColor: role === 'admin' ? 'rgba(114, 46, 209, 0.4)' : role === 'officer' ? 'rgba(250, 140, 22, 0.4)' : 'color-mix(in srgb, var(--color-primary) 40%, transparent)',
                 backgroundColor: role === 'admin' ? 'rgba(114, 46, 209, 0.12)' : role === 'officer' ? 'rgba(250, 140, 22, 0.12)' : 'color-mix(in srgb, var(--color-primary) 12%, transparent)',
@@ -125,7 +125,8 @@ export const Topbar: React.FC<TopbarProps> = ({ onMenuClick, menuOpen = false })
             }}
           >
             <UserCheck className="h-3.5 w-3.5" style={{ color: 'var(--color-primary)' }} />
-            <span>Sign In / Register</span>
+            <span className="hidden sm:inline">Sign In / Register</span>
+            <span className="sm:hidden">Sign In</span>
           </Link>
         )}
       </div>

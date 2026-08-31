@@ -69,13 +69,13 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div style={{ maxWidth: 480, margin: '40px auto', padding: '0 16px' }}>
-      <div style={{ textAlign: 'center', marginBottom: 24 }}>
-        <Title level={2} style={{ margin: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+    <div style={{ maxWidth: 480, margin: '20px auto', padding: '0 16px' }}>
+      <div style={{ textAlign: 'center', marginBottom: 20 }}>
+        <Title level={2} style={{ margin: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 'clamp(1.5rem, 4vw, 2rem)' }}>
           <SafetyCertificateOutlined style={{ color: '#1677ff' }} />
           CivicGrid Portal
         </Title>
-        <Text type="secondary">Authenticated Municipal Grievance & Accountability Platform</Text>
+        <Text type="secondary" style={{ fontSize: 'clamp(0.75rem, 2vw, 0.875rem)' }}>Authenticated Municipal Grievance & Accountability Platform</Text>
       </div>
 
       <Card
@@ -96,6 +96,7 @@ export const LoginPage: React.FC = () => {
             setSuccessMessage(null);
           }}
           centered
+          size="small"
           items={[
             {
               key: 'citizen',
@@ -106,9 +107,9 @@ export const LoginPage: React.FC = () => {
               ),
               children: (
                 <div style={{ paddingTop: 8 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                    <Text strong>{isRegisterMode ? 'Create Citizen Account' : 'Sign in to Citizen Account'}</Text>
-                    <Button type="link" onClick={() => setIsRegisterMode(!isRegisterMode)} style={{ padding: 0 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+                    <Text strong style={{ fontSize: 'clamp(0.875rem, 2.5vw, 1rem)' }}>{isRegisterMode ? 'Create Citizen Account' : 'Sign in to Citizen Account'}</Text>
+                    <Button type="link" onClick={() => setIsRegisterMode(!isRegisterMode)} style={{ padding: 0, fontSize: 'clamp(0.75rem, 2vw, 0.875rem)' }}>
                       {isRegisterMode ? 'Already registered? Login' : 'Need an account? Register'}
                     </Button>
                   </div>
@@ -130,7 +131,7 @@ export const LoginPage: React.FC = () => {
                     </Button>
                   </Form>
                   <div style={{ marginTop: 16, background: 'rgba(22, 119, 255, 0.05)', padding: 12, borderRadius: 8 }}>
-                    <Text type="secondary" style={{ fontSize: 12 }}>
+                    <Text type="secondary" style={{ fontSize: 'clamp(0.7rem, 2vw, 0.75rem)' }}>
                       <strong>Demo Citizen Credentials:</strong><br />
                       • Email: <code>citizen.a@example.com</code> | Password: <code>password123</code>
                     </Text>
@@ -147,7 +148,7 @@ export const LoginPage: React.FC = () => {
               ),
               children: (
                 <div style={{ paddingTop: 8 }}>
-                  <Tag color="blue" style={{ marginBottom: 16, width: '100%', textAlign: 'center', padding: 6 }}>
+                  <Tag color="blue" style={{ marginBottom: 16, width: '100%', textAlign: 'center', padding: 6, fontSize: 'clamp(0.7rem, 2vw, 0.75rem)' }}>
                     Scoped Department & Ward Officer Access
                   </Tag>
                   <Form layout="vertical" onFinish={handleOfficerSubmit}>
@@ -162,7 +163,7 @@ export const LoginPage: React.FC = () => {
                     </Button>
                   </Form>
                   <div style={{ marginTop: 16, background: 'rgba(22, 119, 255, 0.05)', padding: 12, borderRadius: 8 }}>
-                    <Text type="secondary" style={{ fontSize: 12 }}>
+                    <Text type="secondary" style={{ fontSize: 'clamp(0.7rem, 2vw, 0.75rem)' }}>
                       <strong>Demo Officer Credentials:</strong><br />
                       • Officer ID: <code>OFFICER-2026</code> (Public Works / Ward 12)<br />
                       • Password: <code>password123</code>
@@ -180,7 +181,7 @@ export const LoginPage: React.FC = () => {
               ),
               children: (
                 <div style={{ paddingTop: 8 }}>
-                  <Tag color="purple" style={{ marginBottom: 16, width: '100%', textAlign: 'center', padding: 6 }}>
+                  <Tag color="purple" style={{ marginBottom: 16, width: '100%', textAlign: 'center', padding: 6, fontSize: 'clamp(0.7rem, 2vw, 0.75rem)' }}>
                     Municipal Governance & Account Management
                   </Tag>
                   <Form layout="vertical" onFinish={handleAdminSubmit}>
@@ -195,7 +196,7 @@ export const LoginPage: React.FC = () => {
                     </Button>
                   </Form>
                   <div style={{ marginTop: 16, background: 'rgba(114, 46, 209, 0.05)', padding: 12, borderRadius: 8 }}>
-                    <Text type="secondary" style={{ fontSize: 12 }}>
+                    <Text type="secondary" style={{ fontSize: 'clamp(0.7rem, 2vw, 0.75rem)' }}>
                       <strong>Demo Admin Credentials:</strong><br />
                       • Email: <code>admin@civicgrid.gov.in</code> | Password: <code>admin123</code>
                     </Text>

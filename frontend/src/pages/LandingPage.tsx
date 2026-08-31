@@ -45,12 +45,12 @@ const LandingPage: React.FC = () => {
   ];
 
   return (
-    <div className="space-y-14 sm:space-y-20 lg:space-y-24 pb-12 sm:pb-16">
+    <div className="space-y-10 sm:space-y-14 lg:space-y-20 xl:space-y-24 pb-8 sm:pb-12 lg:pb-16">
 
       {/* ── Hero ────────────────────────────────────────────────────────── */}
-      <section className="relative mx-auto max-w-3xl pt-4 sm:pt-8 text-center lg:pt-12 px-1">
+      <section className="relative mx-auto max-w-3xl pt-6 sm:pt-8 text-center lg:pt-12 px-4 sm:px-6">
         <div
-          className="mb-4 inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-semibold uppercase tracking-wider"
+          className="mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-[10px] sm:px-4 sm:py-1.5 sm:text-xs font-semibold uppercase tracking-wider"
           style={{
             backgroundColor: 'color-mix(in srgb, var(--color-primary) 12%, transparent)',
             color: 'var(--color-primary)',
@@ -71,7 +71,7 @@ const LandingPage: React.FC = () => {
         </div>
 
         <h1
-          className="font-display text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight"
+          className="font-display text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight"
           style={{ lineHeight: 1.12 }}
         >
           {t.landing.heroTitle}{' '}
@@ -79,43 +79,43 @@ const LandingPage: React.FC = () => {
         </h1>
 
         <p
-          className="mx-auto mt-4 sm:mt-6 max-w-2xl text-base sm:text-lg lg:text-xl leading-relaxed"
+          className="mx-auto mt-3 sm:mt-4 md:mt-6 max-w-2xl text-sm sm:text-base md:text-lg lg:text-xl leading-relaxed"
           style={{ color: 'var(--color-muted)' }}
         >
           {t.landing.heroSubtitle}
         </p>
 
-        <div className="mt-8 sm:mt-10 flex flex-col items-stretch sm:items-center justify-center gap-3 sm:flex-row">
-          <Link to="/submit" className="btn-primary w-full sm:w-auto">
+        <div className="mt-6 sm:mt-8 md:mt-10 flex flex-col items-stretch sm:items-center justify-center gap-3 sm:flex-row">
+          <Link to="/submit" className="btn-primary w-full sm:w-auto text-sm sm:text-base">
             {t.landing.reportIssueCta}
             <ArrowRight className="h-4 w-4" aria-hidden />
           </Link>
           <Link
             to="/dashboard"
-            className="btn-secondary w-full sm:w-auto"
+            className="btn-secondary w-full sm:w-auto text-sm sm:text-base"
           >
             {t.landing.viewDashboardCta}
           </Link>
         </div>
 
         {/* Issue type pills */}
-        <div className="mt-12 flex flex-wrap justify-center gap-3">
+        <div className="mt-8 sm:mt-10 md:mt-12 flex flex-wrap justify-center gap-2 sm:gap-3">
           {issueExamples.map(({ icon: Icon, label, color }) => (
             <div
               key={label}
-              className="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium"
+              className="flex items-center gap-2 rounded-full px-3 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-sm font-medium"
               style={{
                 backgroundColor: 'var(--color-surface)',
                 border: '1px solid var(--color-border)',
                 color: 'var(--color-text)',
               }}
             >
-              <Icon className="h-3.5 w-3.5" style={{ color }} />
+              <Icon className="h-3 w-3 sm:h-3.5 sm:w-3.5" style={{ color }} />
               {label}
             </div>
           ))}
           <div
-            className="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium"
+            className="flex items-center gap-2 rounded-full px-3 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-sm font-medium"
             style={{
               backgroundColor: 'var(--color-surface)',
               border: '1px solid var(--color-border)',
@@ -128,12 +128,12 @@ const LandingPage: React.FC = () => {
       </section>
 
       {/* ── Live Example ─────────────────────────────────────────────────── */}
-      <section className="mx-auto max-w-4xl">
-        <div className="mb-8 text-center">
-          <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
+      <section className="mx-auto max-w-4xl px-4 sm:px-6">
+        <div className="mb-6 sm:mb-8 text-center">
+          <h2 className="font-display text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight">
             {t.landing.liveDemoTitle}
           </h2>
-          <p className="mt-2 text-sm" style={{ color: 'var(--color-muted)' }}>
+          <p className="mt-2 text-xs sm:text-sm" style={{ color: 'var(--color-muted)' }}>
             {t.landing.liveDemoBadge}
           </p>
         </div>
@@ -141,12 +141,12 @@ const LandingPage: React.FC = () => {
         <div className="grid gap-4 lg:grid-cols-2">
           {/* Raw complaint */}
           <div
-            className="rounded-xl p-6"
+            className="rounded-xl p-4 sm:p-6"
             style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
           >
-            <div className="mb-4 flex items-center gap-2">
+            <div className="mb-3 sm:mb-4 flex items-center gap-2">
               <div
-                className="rounded-md px-2 py-1 text-xs font-semibold uppercase tracking-wide"
+                className="rounded-md px-2 py-1 text-[10px] sm:text-xs font-semibold uppercase tracking-wide"
                 style={{
                   backgroundColor: 'color-mix(in srgb, var(--color-muted) 12%, transparent)',
                   color: 'var(--color-muted)',
@@ -155,19 +155,19 @@ const LandingPage: React.FC = () => {
                 {t.landing.rawComplaintLabel}
               </div>
             </div>
-            <p className="text-base italic leading-relaxed" style={{ color: 'var(--color-text)' }}>
+            <p className="text-sm sm:text-base italic leading-relaxed" style={{ color: 'var(--color-text)' }}>
               "{t.landing.rawComplaintText}"
             </p>
           </div>
 
           {/* Structured result */}
           <div
-            className="rounded-xl p-6"
+            className="rounded-xl p-4 sm:p-6"
             style={{ backgroundColor: 'var(--color-surface)', border: '1px solid color-mix(in srgb, var(--color-primary) 35%, transparent)' }}
           >
-            <div className="mb-4 flex items-center gap-2">
+            <div className="mb-3 sm:mb-4 flex items-center gap-2">
               <div
-                className="rounded-md px-2 py-1 text-xs font-semibold uppercase tracking-wide"
+                className="rounded-md px-2 py-1 text-[10px] sm:text-xs font-semibold uppercase tracking-wide"
                 style={{
                   backgroundColor: 'color-mix(in srgb, var(--color-primary) 12%, transparent)',
                   color: 'var(--color-primary)',
@@ -176,36 +176,36 @@ const LandingPage: React.FC = () => {
                 {t.landing.aiInterpreting}
               </div>
             </div>
-            <dl className="space-y-3">
-              <div className="flex items-start justify-between gap-4">
-                <dt className="w-28 shrink-0 text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-muted)', paddingTop: '2px' }}>
+            <dl className="space-y-2 sm:space-y-3">
+              <div className="flex items-start justify-between gap-2 sm:gap-4">
+                <dt className="w-20 sm:w-28 shrink-0 text-[10px] sm:text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-muted)', paddingTop: '2px' }}>
                   {t.submit.assignedCategory}
                 </dt>
-                <dd className="text-right text-sm font-medium" style={{ color: 'var(--color-text)' }}>
+                <dd className="text-right text-xs sm:text-sm font-medium" style={{ color: 'var(--color-text)' }}>
                   {t.landing.exampleCategory}
                 </dd>
               </div>
-              <div className="flex items-start justify-between gap-4">
-                <dt className="w-28 shrink-0 text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-muted)', paddingTop: '2px' }}>
+              <div className="flex items-start justify-between gap-2 sm:gap-4">
+                <dt className="w-20 sm:w-28 shrink-0 text-[10px] sm:text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-muted)', paddingTop: '2px' }}>
                   {t.submit.assignedSeverity}
                 </dt>
-                <dd className="text-right text-sm font-medium" style={{ color: 'var(--color-text)' }}>
+                <dd className="text-right text-xs sm:text-sm font-medium" style={{ color: 'var(--color-text)' }}>
                   {t.landing.exampleSeverity}
                 </dd>
               </div>
-              <div className="flex items-start justify-between gap-4">
-                <dt className="w-28 shrink-0 text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-muted)', paddingTop: '2px' }}>
+              <div className="flex items-start justify-between gap-2 sm:gap-4">
+                <dt className="w-20 sm:w-28 shrink-0 text-[10px] sm:text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-muted)', paddingTop: '2px' }}>
                   {t.submit.assignedUrgency}
                 </dt>
-                <dd className="text-right text-sm font-medium" style={{ color: 'var(--color-text)' }}>
+                <dd className="text-right text-xs sm:text-sm font-medium" style={{ color: 'var(--color-text)' }}>
                   {t.landing.exampleUrgency}
                 </dd>
               </div>
-              <div className="flex items-start justify-between gap-4">
-                <dt className="w-28 shrink-0 text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-muted)', paddingTop: '2px' }}>
+              <div className="flex items-start justify-between gap-2 sm:gap-4">
+                <dt className="w-20 sm:w-28 shrink-0 text-[10px] sm:text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-muted)', paddingTop: '2px' }}>
                   {t.submit.extractedSummary}
                 </dt>
-                <dd className="text-right text-sm font-medium" style={{ color: 'var(--color-text)' }}>
+                <dd className="text-right text-xs sm:text-sm font-medium" style={{ color: 'var(--color-text)' }}>
                   {t.landing.exampleSummary}
                 </dd>
               </div>
@@ -215,41 +215,41 @@ const LandingPage: React.FC = () => {
       </section>
 
       {/* ── How it works ─────────────────────────────────────────────────── */}
-      <section>
-        <div className="mx-auto mb-12 max-w-xl text-center">
-          <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
+      <section className="px-4 sm:px-6">
+        <div className="mx-auto mb-8 sm:mb-12 max-w-xl text-center">
+          <h2 className="font-display text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight">
             {t.landing.howItWorksTitle}
           </h2>
-          <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--color-muted)' }}>
+          <p className="mt-2 text-xs sm:text-sm leading-relaxed" style={{ color: 'var(--color-muted)' }}>
             {t.landing.howItWorksSubtitle}
           </p>
         </div>
 
-        <ol className="relative grid gap-px sm:grid-cols-2 lg:grid-cols-4">
+        <ol className="relative grid gap-3 sm:gap-px sm:grid-cols-2 lg:grid-cols-4">
           {steps.map((step, index) => {
             const Icon = step.icon;
             return (
               <li
                 key={step.title}
-                className="relative flex flex-col p-6"
+                className="relative flex flex-col p-4 sm:p-6"
                 style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)' }}
               >
                 <div
-                  className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl"
+                  className="mb-3 sm:mb-4 flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-xl"
                   style={{ backgroundColor: 'color-mix(in srgb, var(--color-primary) 10%, transparent)' }}
                 >
-                  <Icon className="h-5 w-5" style={{ color: step.color }} aria-hidden />
+                  <Icon className="h-4 w-4 sm:h-5 sm:w-5" style={{ color: step.color }} aria-hidden />
                 </div>
                 <span
-                  className="mb-1 text-xs font-semibold uppercase tracking-wider"
+                  className="mb-1 text-[10px] sm:text-xs font-semibold uppercase tracking-wider"
                   style={{ color: 'var(--color-muted)' }}
                 >
                   {step.label}
                 </span>
-                <h3 className="font-display text-base font-bold" style={{ color: 'var(--color-text)' }}>
+                <h3 className="font-display text-sm sm:text-base font-bold" style={{ color: 'var(--color-text)' }}>
                   {step.title}
                 </h3>
-                <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--color-muted)' }}>
+                <p className="mt-1 sm:mt-2 text-xs sm:text-sm leading-relaxed" style={{ color: 'var(--color-muted)' }}>
                   {step.description}
                 </p>
                 {index < steps.length - 1 && (
@@ -266,25 +266,25 @@ const LandingPage: React.FC = () => {
 
       {/* ── CTA strip ─────────────────────────────────────────────────────── */}
       <section
-        className="rounded-2xl p-8 text-center sm:p-12"
+        className="mx-auto rounded-2xl p-6 sm:p-8 lg:p-12 text-center"
         style={{
           background: 'linear-gradient(135deg, color-mix(in srgb, var(--color-primary) 8%, var(--color-surface)), var(--color-surface))',
           border: '1px solid color-mix(in srgb, var(--color-primary) 20%, transparent)',
         }}
       >
         <div
-          className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl"
+          className="mx-auto mb-3 flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl"
           style={{ backgroundColor: 'var(--color-primary)' }}
         >
-          <MapPin className="h-6 w-6" style={{ color: 'var(--color-primary-fg)' }} aria-hidden />
+          <MapPin className="h-5 w-5 sm:h-6 sm:w-6" style={{ color: 'var(--color-primary-fg)' }} aria-hidden />
         </div>
-        <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl" style={{ color: 'var(--color-text)' }}>
+        <h2 className="font-display text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight" style={{ color: 'var(--color-text)' }}>
           {t.landing.commonIssuesTitle}
         </h2>
-        <p className="mx-auto mt-3 max-w-lg text-sm leading-relaxed" style={{ color: 'var(--color-muted)' }}>
+        <p className="mx-auto mt-2 sm:mt-3 max-w-lg text-xs sm:text-sm leading-relaxed" style={{ color: 'var(--color-muted)' }}>
           {t.landing.commonIssuesSubtitle}
         </p>
-        <Link to="/submit" className="btn-primary mt-8 inline-flex">
+        <Link to="/submit" className="btn-primary mt-6 sm:mt-8 inline-flex text-sm sm:text-base">
           {t.landing.reportIssueCta}
           <ArrowRight className="h-4 w-4" aria-hidden />
         </Link>

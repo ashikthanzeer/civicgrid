@@ -65,9 +65,15 @@
     --space-6: 64px;
 
     --content-max: 1200px;
-    --header-height: 64px;
+    --header-height: 56px;
     --drawer-width: 280px;
     --transition-drawer: 280ms ease;
+  }
+
+  @media (min-width: 640px) {
+    :root {
+      --header-height: 64px;
+    }
   }
 
   html.dark,

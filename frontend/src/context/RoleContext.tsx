@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { apiClient } from '../api/client';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { apiClient, setAuthErrorHandler } from '../api/client';
 
 export type UserRole = 'citizen' | 'officer' | 'admin';
 
@@ -34,6 +34,7 @@ interface RoleContextType {
   isOfficer: boolean;
   isAdmin: boolean;
   officerProfile: OfficerProfile | null;
+  isAuthenticating: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string; user?: UserProfile }>;
   register: (name: string, email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
@@ -53,22 +54,55 @@ const ROLE_KEY = 'civicgrid_role';
 export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [role, setRole] = useState<UserRole>('citizen');
+  const [isAuthenticating, setIsAuthenticating] = useState(true);
 
   useEffect(() => {
-    const savedToken = localStorage.getItem(TOKEN_KEY);
-    const savedUser = localStorage.getItem(USER_KEY);
-    if (savedToken && savedUser) {
-      try {
-        const parsedUser: UserProfile = JSON.parse(savedUser);
-        setUser(parsedUser);
-        setRole(parsedUser.role.toLowerCase() as UserRole);
-      } catch {
-        localStorage.removeItem(TOKEN_KEY);
-        localStorage.removeItem(USER_KEY);
-        localStorage.removeItem(ROLE_KEY);
+    const restoreSession = async () => {
+      const savedToken = localStorage.getItem(TOKEN_KEY);
+      const savedUser = localStorage.getItem(USER_KEY);
+      
+      if (savedToken && savedUser) {
+        try {
+          const parsedUser: UserProfile = JSON.parse(savedUser);
+          
+          // Validate token by making a request to the /api/auth/me endpoint
+          try {
+            await apiClient('/api/auth/me', {
+              method: 'GET',
+            });
+            // Token is valid, restore session
+            setUser(parsedUser);
+            setRole(parsedUser.role.toLowerCase() as UserRole);
+          } catch (error) {
+            // Token is invalid or expired, clear localStorage
+            localStorage.removeItem(TOKEN_KEY);
+            localStorage.removeItem(USER_KEY);
+            localStorage.removeItem(ROLE_KEY);
+            localStorage.removeItem('civicgrid_officer_profile');
+          }
+        } catch {
+          localStorage.removeItem(TOKEN_KEY);
+          localStorage.removeItem(USER_KEY);
+          localStorage.removeItem(ROLE_KEY);
+          localStorage.removeItem('civicgrid_officer_profile');
+        }
       }
-    }
+      
+      setIsAuthenticating(false);
+    };
+    
+    restoreSession();
   }, []);
+
+  // Register auth error handler to auto-logout on 401 errors
+  const handleAuthError = useCallback(() => {
+    setUser(null);
+    setRole('citizen');
+  }, []);
+
+  useEffect(() => {
+    setAuthErrorHandler(handleAuthError);
+  }, [handleAuthError]);
 
   const saveAuthSession = (authData: AuthResponse) => {
     const userRole = authData.user.role.toLowerCase() as UserRole;
@@ -251,6 +285,7 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isOfficer: role === 'officer',
         isAdmin: role === 'admin',
         officerProfile,
+        isAuthenticating,
         login,
         register,
         logout,

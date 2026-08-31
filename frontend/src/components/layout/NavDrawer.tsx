@@ -74,6 +74,7 @@ export const NavDrawer: React.FC<NavDrawerProps> = ({ isOpen, onClose }) => {
           borderRight: '1px solid var(--color-border)',
           transform: isOpen ? 'translateX(0)' : 'translateX(-100%)',
         }}
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Drawer Header */}
         <div
@@ -124,7 +125,7 @@ export const NavDrawer: React.FC<NavDrawerProps> = ({ isOpen, onClose }) => {
                 end={item.end}
                 onClick={onClose}
                 className={({ isActive }) =>
-                  `flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-semibold transition-all ${
+                  `flex items-center gap-3.5 rounded-xl px-4 py-3.5 text-sm font-semibold transition-all touch-manipulation ${
                     isActive ? 'nav-link-active' : 'nav-link'
                   }`
                 }

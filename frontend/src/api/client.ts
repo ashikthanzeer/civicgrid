@@ -2,6 +2,13 @@ const RAW_API_BASE = import.meta.env.VITE_API_BASE_URL || '';
 // Ensure no trailing slash so ${API_BASE}${endpoint} is always well-formed
 export const API_BASE = RAW_API_BASE.replace(/\/+$/, '');
 
+// Callback for handling auth errors (401) - will be set by RoleContext
+let onAuthError: (() => void) | null = null;
+
+export const setAuthErrorHandler = (handler: () => void) => {
+  onAuthError = handler;
+};
+
 export async function apiClient<T>(
   endpoint: string,
   options: RequestInit = {},
@@ -34,6 +41,22 @@ export async function apiClient<T>(
           if (body?.detail) errorDetail = body.detail;
         } catch {
           // use statusText fallback
+        }
+
+        // Handle 401 Unauthorized - token expired or invalid
+        if (response.status === 401) {
+          // Clear auth data and trigger logout
+          localStorage.removeItem('civicgrid_token');
+          localStorage.removeItem('civicgrid_user_profile');
+          localStorage.removeItem('civicgrid_role');
+          localStorage.removeItem('civicgrid_officer_profile');
+          
+          // Call the auth error handler if registered
+          if (onAuthError) {
+            onAuthError();
+          }
+          
+          throw new Error('Session expired. Please log in again.');
         }
 
         // Retry on 502/503/504 gateway timeouts caused by Render cold start
